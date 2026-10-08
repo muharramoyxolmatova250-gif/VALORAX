@@ -183,7 +183,7 @@ function LotCard({
 
         {/* Status */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-[15.09.2026 21:15] Humoyun: <span
+                <span
             className="px-2 py-1 rounded-sm text-[8px] font-black tracking-widest"
             style={{
               background: isLive
@@ -334,7 +334,7 @@ function LotCard({
             </span>
 
           </div>
-[15.09.2026 21:15] Humoyun: <motion.span
+                  <motion.span
             whileHover={{ x: 2 }}
             className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
             style={{ color: GOLD }}
