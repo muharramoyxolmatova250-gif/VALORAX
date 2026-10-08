@@ -1,189 +1,489 @@
- import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, Zap } from 'lucide-react'
-import { GoldBtn, Tag, SectionLabel, GOLD, GOLD_DIM, GOLD_FAINT, CARD_BG } from './ui'
-import type { AuctionLot, AuctionCategory } from '../types'
+ import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Clock,
+  Gavel,
+  ExternalLink,
+  Radio,
+} from 'lucide-react'
 
-interface Props {
+import {
+  GOLD,
+  GOLD_DIM,
+  GOLD_FAINT,
+  CARD_BG,
+} from './ui'
+
+import type {
+  AuctionCategory,
+  AuctionLot,
+} from '../types'
+
+interface AuctionDirectoryProps {
   lots: AuctionLot[]
   onSelect: (lot: AuctionLot) => void
 }
 
-const TABS: AuctionCategory[] = ['ALL', 'Hypercars', 'Media', 'Equity', 'Real Estate']
+const TABS: AuctionCategory[] = [
+  'ALL',
+  'Cars',
+  'Watches',
+  'Jewelry',
+  'Fine Art',
+  'Real Estate',
+  'Collectibles',
+  'Historical',
+  'Digital Assets',
+  'Aircraft',
+  'Wine & Spirits',
+  'Motorcycles',
+  'Luxury',
+]
 
-const CAT_COLOR: Record<string, string> = {
-  Hypercars: 'rgba(239,68,68,0.6)',
-  Media: 'rgba(139,92,246,0.65)',
-  Equity: 'rgba(59,130,246,0.65)',
-  'Real Estate': 'rgba(16,185,129,0.6)',
+const CATEGORY_ICONS: Record<string, string> = {
+  ALL: '◆',
+  Cars: '🚗',
+  Watches: '⌚',
+  Jewelry: '💎',
+  'Fine Art': '🎨',
+  'Real Estate': '🏙️',
+  Collectibles: '🏆',
+  Historical: '🏛️',
+  'Digital Assets': '◇',
+  Aircraft: '✈️',
+  'Wine & Spirits': '🍷',
+  Motorcycles: '🏍️',
+  Luxury: '♛',
 }
 
-function useCountdown(initial: number) {
-  const [s, setS] = useState(initial)
+const CATEGORY_COLORS: Record<string, string> = {
+  Cars: '#D4AF37',
+  Watches: '#C9A227',
+  Jewelry: '#E8D28A',
+  'Fine Art': '#BFA76F',
+  'Real Estate': '#A98C45',
+  Collectibles: '#D6B85A',
+  Historical: '#B89B5E',
+  'Digital Assets': '#D4AF37',
+  Aircraft: '#C6A85B',
+  'Wine & Spirits': '#A88942',
+  Motorcycles: '#D1AF45',
+  Luxury: '#E0C568',
+}
+
+function useCountdown(initialSeconds: number) {
+  const [seconds, setSeconds] = useState(
+    Math.max(0, initialSeconds)
+  )
+
   useEffect(() => {
-    const t = setInterval(() => setS(v => (v > 0 ? v - 1 : 0)), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+    setSeconds(Math.max(0, initialSeconds))
+  }, [initialSeconds])
+
+  useEffect(() => {
+    if (seconds <= 0) return
+
+    const timer = window.setInterval(() => {
+      setSeconds(prev => Math.max(0, prev - 1))
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [seconds])
+
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+
+  return {
+    days,
+    hours,
+    minutes,
+    seconds: secs,
+  }
 }
 
-function LotCard({ lot, onSelect }: { lot: AuctionLot; onSelect: () => void }) {
+function formatCountdown(
+  days: number,
+  hours: number,
+  minutes: number,
+  seconds: number
+) {
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, '0')}h`
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(
+    minutes
+  ).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function LotCard({
+  lot,
+  onSelect,
+}: {
+  lot: AuctionLot
+  onSelect: (lot: AuctionLot) => void
+}) {
   const countdown = useCountdown(lot.secondsLeft)
-  const catColor = CAT_COLOR[lot.category] ?? GOLD_DIM
+
+  const categoryColor =
+    CATEGORY_COLORS[lot.category] || GOLD
+
+  const isLive =
+    lot.status === 'LIVE' ||
+    (!lot.status && lot.secondsLeft > 0)
 
   return (
     <motion.div
-      whileHover={{ y: -3, boxShadow: '0 12px 40px rgba(212,175,55,0.08)' }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className="rounded-xl overflow-hidden cursor-pointer flex flex-col justify-between"
-      style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.15)', backdropFilter: 'blur(20px)' }}
-      onClick={onSelect}
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{
+        y: -4,
+        boxShadow: '0 18px 50px rgba(212,175,55,0.10)',
+      }}
+      className="group rounded-xl overflow-hidden cursor-pointer"
+      style={{
+        background: CARD_BG,
+        border: '1px solid rgba(212,175,55,0.14)',
+      }}
+      onClick={() => onSelect(lot)}
     >
-      <div className="relative h-44">
-        <img 
-          src={lot.image} 
-          alt={lot.title} 
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-          style={{ filter: 'brightness(0.65) saturate(0.85)' }} 
+      {/* Image */}
+      <div className="relative h-56 overflow-hidden">
+
+        <img
+          src={lot.image}
+          alt={lot.title}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          style={{
+            filter: 'brightness(0.68) saturate(0.82)',
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121417] via-black/20 to-transparent" />
-        
-        {/* Top Badges */}
-        <div className="absolute top-2 left-2 right-2 flex items-start justify-between">
-          <Tag color={catColor}>{lot.category}</Tag>
-          {lot.verified && (
-            <div 
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm"
-              style={{ background: 'rgba(212,175,55,0.07)', border: `1px solid ${GOLD_FAINT}` }}
-            >
-              <Shield size={10} style={{ color: GOLD }} />
-              <span className="text-[8px] font-bold tracking-wider" style={{ color: GOLD }}>ZK-VERIFIED</span>
-            </div>
-          )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-transparent to-transparent" />
+
+        {/* Category */}
+        <div
+          className="absolute top-3 left-3 px-2.5 py-1 rounded-sm"
+          style={{
+            background: 'rgba(7,8,10,0.78)',
+            border: `1px solid ${categoryColor}55`,
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <span
+            className="text-[9px] font-black tracking-widest uppercase"
+            style={{ color: categoryColor }}
+          >
+            {CATEGORY_ICONS[lot.category]} {lot.category}
+          </span>
         </div>
 
-        {/* Live Indicator & Title */}
-        <div className="absolute bottom-2 left-3 right-3">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <motion.div 
-              animate={{ opacity: [1, 0.2, 1] }} 
-              transition={{ repeat: Infinity, duration: 1.6 }}
-              className="w-1.5 h-1.5 rounded-full bg-red-500" 
-              style={{ boxShadow: '0 0 5px rgba(239,68,68,0.9)' }} 
-            />
-            <span className="text-[8px] tracking-widest font-bold text-white/60 uppercase">LIVE AUCTION</span>
-          </div>
-          <p className="text-white font-black text-sm leading-tight truncate">{lot.title}</p>
+        {/* Status */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+[15.09.2026 21:15] Humoyun: <span
+            className="px-2 py-1 rounded-sm text-[8px] font-black tracking-widest"
+            style={{
+              background: isLive
+                ? 'rgba(16,185,129,0.10)'
+                : 'rgba(255,255,255,0.06)',
+              border: isLive
+                ? '1px solid rgba(16,185,129,0.25)'
+                : '1px solid rgba(255,255,255,0.10)',
+              color: isLive
+                ? '#34D399'
+                : 'rgba(255,255,255,0.45)',
+            }}
+          >
+            {isLive ? (
+              <span className="inline-flex items-center gap-1">
+                <Radio size={8} />
+                LIVE
+              </span>
+            ) : (
+              lot.status || 'AUCTION'
+            )}
+          </span>
+
+        </div>
+
+        {/* Bottom title */}
+        <div className="absolute bottom-4 left-4 right-4">
+
+          <p className="text-white font-black text-lg leading-tight">
+            {lot.title}
+          </p>
+
+          <p className="text-[10px] text-white/45 mt-1 line-clamp-1">
+            {lot.subtitle}
+          </p>
+
         </div>
       </div>
 
-      <div className="p-3 space-y-2.5 flex-1 flex flex-col justify-between">
-        <p className="text-[9px] text-white/50 leading-snug line-clamp-2">{lot.subtitle}</p>
+      {/* Content */}
+      <div className="p-4 space-y-4">
 
-        {/* Auction Metrics */}
-        <div className="grid grid-cols-3 gap-1.5 my-2">
-          <div className="p-2 rounded-sm" style={{ background: 'rgba(212,175,55,0.04)', border: `1px solid ${GOLD_FAINT}` }}>
-            <p className="text-[7px] tracking-widest font-bold uppercase" style={{ color: GOLD_DIM }}>TOP BID</p>
-                 <p className="font-black text-[11px] mt-0.5 truncate" style={{ color: GOLD }}>
-              {lot.currentBid > 0 ? `$${(lot.currentBid / 1e6).toFixed(1)}M` : 'OPEN'}
-            </p>
+        {/* Source */}
+        <div className="flex items-center justify-between">
+
+          <div className="flex items-center gap-2">
+
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                background: GOLD,
+                boxShadow:
+                  '0 0 8px rgba(212,175,55,0.6)',
+              }}
+            />
+
+            <span
+              className="text-[9px] font-bold tracking-widest uppercase"
+              style={{ color: GOLD_DIM }}
+            >
+              {lot.source || 'GLOBAL AUCTION'}
+            </span>
 
           </div>
-          <div className="p-2 rounded-sm" style={{ background: 'rgba(212,175,55,0.04)', border: `1px solid ${GOLD_FAINT}` }}>
-            <p className="text-[7px] tracking-widest font-bold uppercase" style={{ color: GOLD_DIM }}>TIME</p>
-            <p className="font-mono font-black text-[10px] mt-0.5" style={{ color: GOLD }}>{countdown}</p>
-          </div>
-          <div className="p-2 rounded-sm" style={{ background: 'rgba(212,175,55,0.04)', border: `1px solid ${GOLD_FAINT}` }}>
-            <p className="text-[7px] tracking-widest font-bold uppercase" style={{ color: GOLD_DIM }}>BIDS</p>
-            <p className="font-black text-[11px] mt-0.5" style={{ color: GOLD }}>{lot.bids}</p>
-          </div>
+
+          {lot.currency && (
+            <span className="text-[8px] text-white/30">
+              {lot.currency}
+            </span>
+          )}
+
         </div>
 
-        {/* Action Button */}
-        <GoldBtn full sm onClick={onSelect}>
-          <Zap size={10} /> EZIB KIRISH & BID (3% ESCROW)
-        </GoldBtn>
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-2">
+
+          <div
+            className="p-3 rounded-sm"
+            style={{
+              background: 'rgba(212,175,55,0.035)',
+              border: `1px solid ${GOLD_FAINT}`,
+            }}
+          >
+            <p
+              className="text-[8px] tracking-widest font-bold uppercase"
+              style={{ color: GOLD_DIM }}
+            >
+              CURRENT BID
+            </p>
+
+            <p
+              className="font-black text-base mt-1"
+              style={{ color: GOLD }}
+            >
+              {lot.currentBid > 0
+                ? '$' + lot.currentBid.toLocaleString()
+                : '—'}
+            </p>
+          </div>
+
+          <div
+            className="p-3 rounded-sm"
+            style={{
+              background: 'rgba(212,175,55,0.035)',
+              border: `1px solid ${GOLD_FAINT}`,
+            }}
+          >
+            <p
+              className="text-[8px] tracking-widest font-bold uppercase"
+              style={{ color: GOLD_DIM }}
+            >
+              <Clock
+                size={8}
+                className="inline mr-1"
+              />
+              TIME
+            </p>
+
+            <p
+              className="font-black text-base mt-1"
+              style={{ color: GOLD }}
+            >
+              {formatCountdown(
+                countdown.days,
+                countdown.hours,
+                countdown.minutes,
+                countdown.seconds
+              )}
+            </p>
+          </div>
+
+        </div>
+
+        {/* Bottom information */}
+        <div className="flex items-center justify-between">
+
+          <div className="flex items-center gap-2">
+
+            <Gavel
+              size={11}
+              style={{ color: GOLD_DIM }}
+            />
+
+            <span className="text-[9px] text-white/35">
+              {lot.bids > 0
+                ? `${lot.bids} bids`
+                : 'Auction data'}
+            </span>
+
+          </div>
+[15.09.2026 21:15] Humoyun: <motion.span
+            whileHover={{ x: 2 }}
+            className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+            style={{ color: GOLD }}
+          >
+            VIEW LOT
+            <ExternalLink size={9} />
+          </motion.span>
+
+        </div>
+
       </div>
     </motion.div>
   )
 }
 
-export default function AuctionDirectory({ lots, onSelect }: Props) {
-  const [activeTab, setActiveTab] = useState<AuctionCategory>('ALL')
+export default function AuctionDirectory({
+  lots,
+  onSelect,
+}: AuctionDirectoryProps) {
+  const [activeTab, setActiveTab] =
+    useState<AuctionCategory>('ALL')
 
-  const filtered = activeTab === 'ALL' ? lots : lots.filter(l => l.category === activeTab)
+  const filteredLots =
+    activeTab === 'ALL'
+      ? lots
+      : lots.filter(
+          lot => lot.category === activeTab
+        )
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+
         <div>
-          <SectionLabel>SOVEREIGN AUCTION DIRECTORY</SectionLabel>
-          <h2 className="text-white text-xl font-black tracking-tight mt-0.5">
-            Live <span style={{ color: GOLD }}>Auction Vaults</span>
-          </h2>
-        </div>
-        <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-sm"
-          style={{ background: 'rgba(212,175,55,0.04)', border: `1px solid ${GOLD_FAINT}` }}
-        >
-          <motion.div 
-            animate={{ opacity: [1, 0.3, 1] }} 
-            transition={{ repeat: Infinity, duration: 2.2 }}
-            className="w-1.5 h-1.5 rounded-full" 
-            style={{ background: GOLD }} 
-          />
-          <span className="text-[9px] font-mono font-bold tracking-wider" style={{ color: GOLD_DIM }}>
-            {lots.length} ACTIVE LOTS
-          </span>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        {TABS.map(tab => (
-          <motion.button
-            key={tab}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => setActiveTab(tab)}
-            className="shrink-0 px-3 py-1.5 rounded-sm text-[9px] font-bold tracking-widest uppercase transition-all"
-            style={{
-              background: activeTab === tab ? 'rgba(212,175,55,0.1)' : 'rgba(212,175,55,0.03)',
-              border: `1px solid ${activeTab === tab ? 'rgba(212,175,55,0.4)' : GOLD_FAINT}`,
-              color: activeTab === tab ? GOLD : 'rgba(212,175,55,0.45)',
-            }}
+          <p
+            className="text-[9px] tracking-[0.25em] font-bold uppercase mb-2"
+            style={{ color: GOLD_DIM }}
           >
-            {tab}
-            <span className="ml-1.5 text-[7px] text-white/30 font-mono">
-              {tab === 'ALL' ? lots.length : lots.filter(l => l.category === tab).length}
-            </span>
-          </motion.button>
-        ))}
+            GLOBAL AUCTION NETWORK
+          </p>
+
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Live Auction Vaults
+          </h2>
+
+          <p className="text-xs text-white/35 mt-2 max-w-xl">
+            Curated access to rare assets across global
+            auction markets.
+          </p>
+        </div>
+
+        <div
+          className="text-[9px] font-mono tracking-widest"
+          style={{ color: GOLD_DIM }}
+        >
+          {filteredLots.length} LOTS
+        </div>
+
       </div>
 
-      {/* Grid */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.25 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          {filtered.map((lot, i) => (
-            <motion.div 
-              key={lot.id} 
-              initial={{ opacity: 0, y: 16 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: i * 0.05 }}
+      {/* Categories */}
+      <div
+        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+      >
+        {TABS.map(tab => {
+
+          const active = activeTab === tab
+
+          const count =
+            tab === 'ALL'
+              ? lots.length
+              : lots.filter(
+                  lot => lot.category === tab
+                ).length
+
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="shrink-0 px-3.5 py-2 rounded-sm transition-all"
+              style={{
+                background: active
+                  ? 'rgba(212,175,55,0.10)'
+                  : 'rgba(255,255,255,0.025)',
+                border: active
+                  ? '1px solid rgba(212,175,55,0.35)'
+                  : '1px solid rgba(255,255,255,0.07)',
+                color: active
+                  ? GOLD
+                  : 'rgba(255,255,255,0.42)',
+              }}
             >
-              <LotCard lot={lot} onSelect={() => onSelect(lot)} />
-            </motion.div>
+              <span className="text-[9px] font-black tracking-widest uppercase">
+                {CATEGORY_ICONS[tab]} {tab}
+              </span>
+
+              <span
+                className="ml-1.5 text-[8px]"
+                style={{
+                  opacity: 0.5,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Lots */}
+      {filteredLots.length > 0 ? (
+        <motion.div
+          layout
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+        >
+          {filteredLots.map(lot => (
+            <LotCard
+              key={lot.id}
+              lot={lot}
+              onSelect={onSelect}
+            />
           ))}
         </motion.div>
-      </AnimatePresence>
+      ) : (
+        <div
+          className="rounded-xl py-16 text-center"
+          style={{
+            background: CARD_BG,
+            border:
+              '1px solid rgba(212,175,55,0.10)',
+          }}
+        >
+          <div className="text-3xl mb-3">
+            ◇
+          </div>
+
+          <p className="text-sm font-bold text-white/60">
+            No auction lots available
+          </p>
+
+          <p className="text-[10px] text-white/25 mt-2">
+            Auction inventory will appear here when
+            the global data feed is connected.
+          </p>
+        </div>
+      )}
+
     </div>
   )
 }

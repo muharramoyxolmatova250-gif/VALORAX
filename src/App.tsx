@@ -1,4 +1,4 @@
- import { useState } from 'react'
+ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Lock, Activity, Shield, TrendingUp } from 'lucide-react'
 
@@ -11,9 +11,18 @@ import StakingModal from './components/StakingModal'
 import RegisterModal from './components/RegisterModal'
 import CreateAuctionModal from './components/CreateAuctionModal'
 import LiveTicker from './components/LiveTicker'
-import { GOLD, GOLD_DIM, GOLD_FAINT, CARD_BG, GoldDivider } from './components/ui'
 
-import { PROFILES, AUCTION_LOTS } from './data'
+import {
+  GOLD,
+  GOLD_DIM,
+  GOLD_FAINT,
+  CARD_BG,
+  GoldDivider,
+} from './components/ui'
+
+import { PROFILES } from './data'
+import { fetchAllGlobalAuctions } from './services/rwaAuctions'
+
 import type { Profile, AuctionLot } from './types'
 
 export default function App() {
@@ -21,28 +30,64 @@ export default function App() {
   const [connected, setConnected] = useState(false)
   const [sovereignHandle, setSovereignHandle] = useState('')
 
-  // Modal/drawer state
+  // Modal / drawer state
   const [stakingOpen, setStakingOpen] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [createAuctionOpen, setCreateAuctionOpen] = useState(false)
+
   const [claimProfile, setClaimProfile] = useState<Profile | null>(null)
   const [activeLot, setActiveLot] = useState<AuctionLot | null>(null)
   const [auctionOpen, setAuctionOpen] = useState(false)
 
-  // Lots state — starts with seed data, user-created lots get prepended
-  const [lots, setLots] = useState<AuctionLot[]>(AUCTION_LOTS)
+  // Auction lots
+  // Eski AUCTION_LOTS demo ma'lumotlari endi ishlatilmaydi.
+  const [lots, setLots] = useState<AuctionLot[]>([])
 
+  // Load auction data from API
+  useEffect(() => {
+    const loadAuctions = async () => {
+      const auctions = await fetchAllGlobalAuctions()
+      setLots(auctions)
+    }
+
+    loadAuctions()
+  }, [])
+
+  // Bid handler
   const handleBid = (lotId: string, amount: number) => {
-    setLots(prev => prev.map(l => l.id === lotId ? { ...l, currentBid: amount, escrow: amount, bids: l.bids + 1 } : l))
+    setLots(prev =>
+      prev.map(l =>
+        l.id === lotId
+          ? {
+              ...l,
+              currentBid: amount,
+              escrow: amount,
+              bids: l.bids + 1,
+            }
+          : l
+      )
+    )
+
     if (activeLot?.id === lotId) {
-      setActiveLot(prev => prev ? { ...prev, currentBid: amount, escrow: amount, bids: prev.bids + 1 } : prev)
+      setActiveLot(prev =>
+        prev
+          ? {
+              ...prev,
+              currentBid: amount,
+              escrow: amount,
+              bids: prev.bids + 1,
+            }
+          : prev
+      )
     }
   }
 
+  // Create new auction
   const handleLotCreated = (lot: AuctionLot) => {
     setLots(prev => [lot, ...prev])
   }
 
+  // Open auction modal
   const openAuction = (lot: AuctionLot) => {
     setActiveLot(lot)
     setAuctionOpen(true)
@@ -57,7 +102,7 @@ export default function App() {
           'radial-gradient(ellipse 70% 45% at 50% -5%, rgba(212,175,55,0.055) 0%, transparent 70%), radial-gradient(ellipse 40% 30% at 15% 65%, rgba(212,175,55,0.025) 0%, transparent 60%)',
       }}
     >
-      {/* ── Header ── */}
+      {/* Header */}
       <Header
         connected={connected}
         onConnect={() => setConnected(c => !c)}
@@ -66,11 +111,11 @@ export default function App() {
         onRegister={() => setRegisterOpen(true)}
       />
 
-      {/* ── Main Canvas ── */}
+      {/* Main Canvas */}
       <main className="flex-1 overflow-auto">
         <div className="max-w-[1440px] mx-auto px-6 py-8 space-y-14">
 
-          {/* Sovereign greeting if registered */}
+          {/* Sovereign greeting */}
           <AnimatePresence>
             {sovereignHandle && (
               <motion.div
@@ -78,9 +123,18 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 className="flex items-center gap-3 px-5 py-3 rounded-lg"
-                style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)' }}
+                style={{
+                  background: 'rgba(16,185,129,0.05)',
+                   border: '1px solid rgba(16,185,129,0.2)',
+                }}
               >
-                <div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px rgba(52,211,153,0.9)' }} />
+                <div
+                  className="w-2 h-2 rounded-full bg-emerald-400"
+                  style={{
+                    boxShadow: '0 0 6px rgba(52,211,153,0.9)',
+                  }}
+                />
+
                 <p className="text-[10px] font-mono font-bold tracking-widest text-emerald-400">
                   SOVEREIGN ACTIVE · {sovereignHandle.toUpperCase()} · ZK-PROOF VERIFIED
                 </p>
@@ -88,117 +142,309 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* ── Auction Directory ── */}
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <AuctionDirectory lots={lots} onSelect={openAuction} />
+          {/* Auction Directory */}
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <AuctionDirectory
+              lots={lots}
+              onSelect={openAuction}
+            />
           </motion.section>
 
-          <div className="h-px w-full" style={{ background: GOLD_FAINT, opacity: 0.5 }} />
-                     {/* ── Sovereign Wall + Featured lot ── */}
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div
+            className="h-px w-full"
+            style={{
+              background: GOLD_FAINT,
+              opacity: 0.5,
+            }}
+          />
+
+          {/* Sovereign Wall + Featured lot */}
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-10">
-              <ProfileWall profiles={PROFILES} onClaim={p => setClaimProfile(p)} />
+
+              <ProfileWall
+                profiles={PROFILES}
+                onClaim={p => setClaimProfile(p)}
+              />
 
               {/* Featured vault snapshot */}
               <div className="xl:sticky xl:top-[100px] xl:self-start space-y-3">
+
                 <div>
-                  <p className="text-[9px] tracking-widest font-bold uppercase mb-2" style={{ color: GOLD_DIM }}>FEATURED VAULT</p>
+                  <p
+                    className="text-[9px] tracking-widest font-bold uppercase mb-2"
+                    style={{ color: GOLD_DIM }}
+                  >
+                    FEATURED VAULT
+                  </p>
+
                   <GoldDivider />
                 </div>
+
                 {(() => {
                   const lot = lots[0]
+
                   if (!lot) return null
+
                   return (
                     <motion.div
-                      whileHover={{ y: -2, boxShadow: '0 16px 50px rgba(212,175,55,0.1)' }}
+                      whileHover={{
+                        y: -2,
+                        boxShadow:
+                          '0 16px 50px rgba(212,175,55,0.1)',
+                      }}
                       className="rounded-xl overflow-hidden cursor-pointer"
-                      style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.22)' }}
+                      style={{
+                        background: CARD_BG,
+                        border:
+                          '1px solid rgba(212,175,55,0.22)',
+                      }}
                       onClick={() => openAuction(lot)}
                     >
+
                       <div className="relative h-52">
-                        <img src={lot.image} alt={lot.title} className="w-full h-full object-cover"
-                          style={{ filter: 'brightness(0.48) saturate(0.75)' }} />
+
+                        <img
+                          src={lot.image}
+                          alt={lot.title}
+                          className="w-full h-full object-cover"
+                          style={{
+                            filter:
+                              'brightness(0.48) saturate(0.75)',
+                          }}
+                        />
+
                         <div className="absolute inset-0 bg-gradient-to-t from-[#121417] to-transparent" />
-                        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                          style={{ background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)' }}>
-                          <Shield size={9} style={{ color: GOLD }} />
-                          <span className="text-[9px] font-bold tracking-wider" style={{ color: GOLD }}>SOVEREIGN VERIFIED</span>
+
+                        <div
+                          className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                          style={{
+                            background:
+                              'rgba(212,175,55,0.07)',
+                            border:
+                              '1px solid rgba(212,175,55,0.2)',
+                          }}
+                        >
+                          <Shield
+                            size={9}
+                            style={{ color: GOLD }}
+                          />
+
+                          <span
+                            className="text-[9px] font-bold tracking-wider"
+                            style={{ color: GOLD }}
+                          >
+                            SOVEREIGN VERIFIED
+                          </span>
                         </div>
-                        <div className="absolute bottom-3 left-4">
-                          <p className="text-[9px] tracking-widest font-semibold uppercase mb-0.5" style={{ color: GOLD_DIM }}>FEATURED LOT</p>
-                          <p className="text-white font-black text-lg leading-tight">{lot.title}</p>
-                          <p className="text-xs text-white/40 mt-0.5">{lot.subtitle}</p>
+[15.09.2026 21:04] Humoyun: <div className="absolute bottom-3 left-4">
+
+                          <p
+                            className="text-[9px] tracking-widest font-semibold uppercase mb-0.5"
+                            style={{ color: GOLD_DIM }}
+                          >
+                            FEATURED LOT
+                          </p>
+
+                          <p className="text-white font-black text-lg leading-tight">
+                            {lot.title}
+                          </p>
+
+                          <p className="text-xs text-white/40 mt-0.5">
+                            {lot.subtitle}
+                          </p>
+
                         </div>
                       </div>
+
                       <div className="p-4 space-y-3">
+
                         <div className="grid grid-cols-2 gap-2">
+
                           {[
-                            ['TOP BID', '$' + lot.currentBid.toLocaleString()],
-                            ['ESCROW', '$' + lot.escrow.toLocaleString()]
+                            [
+                              'TOP BID',
+                              '$' +
+                                lot.currentBid.toLocaleString(),
+                            ],
+                            [
+                              'ESCROW',
+                              '$' +
+                                lot.escrow.toLocaleString(),
+                            ],
                           ].map(([k, v]) => (
-                            <div key={k} className="p-3 rounded-sm" style={{ background: 'rgba(212,175,55,0.04)', border: '1px solid ' + GOLD_FAINT }}>
-                              <p className="text-[8px] tracking-widest font-bold uppercase" style={{ color: GOLD_DIM }}>{k}</p>
-                              <p className="font-black text-base mt-1" style={{ color: GOLD }}>{v}</p>
+                            <div
+                              key={k}
+                              className="p-3 rounded-sm"
+                              style={{
+                                background:
+                                  'rgba(212,175,55,0.04)',
+                                border:
+                                  '1px solid ' + GOLD_FAINT,
+                              }}
+                            >
+                              <p
+                                className="text-[8px] tracking-widest font-bold uppercase"
+                                style={{ color: GOLD_DIM }}
+                              >
+                                {k}
+                              </p>
+
+                              <p
+                                className="font-black text-base mt-1"
+                                style={{ color: GOLD }}
+                              >
+                                {v}
+                              </p>
                             </div>
                           ))}
+
                         </div>
-                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           className="w-full py-3 rounded-sm text-[10px] font-black tracking-widest uppercase text-[#0B0B0C]"
-                          style={{ background: 'linear-gradient(135deg, #D4AF37 0%, #B8941E 100%)', boxShadow: '0 0 22px rgba(212,175,55,0.22)' }}
-                          onClick={() => openAuction(lot)}>
+                          style={{
+                            background:
+                              'linear-gradient(135deg, #D4AF37 0%, #B8941E 100%)',
+                            boxShadow:
+                              '0 0 22px rgba(212,175,55,0.22)',
+                          }}
+                          onClick={() => openAuction(lot)}
+                        >
                           ⚡️ ENTER AUCTION VAULT
                         </motion.button>
+
                       </div>
                     </motion.div>
                   )
                 })()}
+
               </div>
             </div>
           </motion.section>
-                      {/* ── Stats Row ── */}
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+
+          {/* Stats Row */}
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
               {[
-                { icon: <Lock size={11} />, label: 'TOTAL ESCROW LOCKED', value: '$38.4M', unit: 'USDT' },
-                { icon: <Activity size={11} />, label: 'ACTIVE AUCTIONS', value: String(lots.length), unit: 'LOTS' },
-                { icon: <Shield size={11} />, label: 'SOVEREIGN ACCOUNTS', value: '2,814', unit: 'VERIFIED' },
-                { icon: <TrendingUp size={11} />, label: 'STAKING POOL APY', value: '8.4%', unit: 'USDT POOL' },
+                {
+                  icon: <Lock size={11} />,
+                  label: 'TOTAL ESCROW LOCKED',
+                  value: '$38.4M',
+                  unit: 'USDT',
+                },
+                {
+                 icon: <Activity size={11} />,
+                  label: 'ACTIVE AUCTIONS',
+                  value: String(lots.length),
+                  unit: 'LOTS',
+                },
+                {
+                  icon: <Shield size={11} />,
+                  label: 'SOVEREIGN ACCOUNTS',
+                  value: '2,814',
+                  unit: 'VERIFIED',
+                },
+                {
+                  icon: <TrendingUp size={11} />,
+                  label: 'STAKING POOL APY',
+                  value: '8.4%',
+                  unit: 'USDT POOL',
+                },
               ].map(stat => (
-                <motion.div key={stat.label} whileHover={{ borderColor: 'rgba(212,175,55,0.3)', y: -2 }}
+                <motion.div
+                  key={stat.label}
+                  whileHover={{
+                    borderColor:
+                      'rgba(212,175,55,0.3)',
+                    y: -2,
+                  }}
                   className="p-4 rounded-xl transition-all"
-                  style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.12)', backdropFilter: 'blur(16px)' }}>
-                  <div className="flex items-center gap-1.5 mb-2" style={{ color: GOLD_DIM }}>
+                  style={{
+                    background: CARD_BG,
+                    border:
+                      '1px solid rgba(212,175,55,0.12)',
+                    backdropFilter: 'blur(16px)',
+                  }}
+                >
+                  <div
+                    className="flex items-center gap-1.5 mb-2"
+                    style={{ color: GOLD_DIM }}
+                  >
                     {stat.icon}
-                    <p className="text-[8px] tracking-widest font-bold uppercase" style={{ color: GOLD_DIM }}>{stat.label}</p>
+
+                    <p
+                      className="text-[8px] tracking-widest font-bold uppercase"
+                      style={{ color: GOLD_DIM }}
+                    >
+                      {stat.label}
+                    </p>
                   </div>
-                  <p className="font-black text-2xl" style={{ color: GOLD }}>{stat.value}</p>
-                  <p className="text-[9px] font-medium mt-0.5 text-white/28">{stat.unit}</p>
+
+                  <p
+                    className="font-black text-2xl"
+                    style={{ color: GOLD }}
+                  >
+                    {stat.value}
+                  </p>
+
+                  <p className="text-[9px] font-medium mt-0.5 text-white/28">
+                    {stat.unit}
+                  </p>
                 </motion.div>
               ))}
+
             </div>
           </motion.section>
+
         </div>
       </main>
 
-      {/* ── Footer Ticker ── */}
+      {/* Footer Ticker */}
       <LiveTicker />
 
-      {/* ── Modals & Drawers ── */}
+      {/* Staking Modal */}
       <AnimatePresence>
-        {stakingOpen && <StakingModal key="staking" open={stakingOpen} onClose={() => setStakingOpen(false)} />}
+        {stakingOpen && (
+          <StakingModal
+            key="staking"
+            open={stakingOpen}
+            onClose={() => setStakingOpen(false)}
+          />
+        )}
       </AnimatePresence>
 
+      {/* Register Modal */}
       <AnimatePresence>
         {registerOpen && (
           <RegisterModal
             key="register"
             open={registerOpen}
             onClose={() => setRegisterOpen(false)}
-            onVerified={handle => { setSovereignHandle(handle); setConnected(true) }}
+            onVerified={handle => {
+              setSovereignHandle(handle)
+              setConnected(true)
+            }}
           />
         )}
       </AnimatePresence>
 
+      {/* Create Auction Modal */}
       <AnimatePresence>
         {createAuctionOpen && (
           <CreateAuctionModal
@@ -211,18 +457,23 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Auction Modal */}
       <AnimatePresence>
         {auctionOpen && activeLot && (
           <AuctionModal
             key={'auction-' + activeLot.id}
             lot={activeLot}
             open={auctionOpen}
-            onClose={() => { setAuctionOpen(false); setActiveLot(null) }}
+            onClose={() => {
+              setAuctionOpen(false)
+              setActiveLot(null)
+            }}
             onBid={handleBid}
           />
         )}
       </AnimatePresence>
 
+      {/* Sovereign Drawer */}
       <AnimatePresence>
         {claimProfile && (
           <SovereignDrawer
