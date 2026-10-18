@@ -1,10 +1,13 @@
- import { useEffect, useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Clock,
   Gavel,
   ExternalLink,
   Radio,
+  Search,
+  X,
 } from 'lucide-react'
 
 import {
@@ -73,7 +76,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function useCountdown(initialSeconds: number) {
   const [seconds, setSeconds] = useState(
-    Math.max(0, initialSeconds)
+    Math.max(0, initialSeconds),
   )
 
   useEffect(() => {
@@ -107,14 +110,14 @@ function formatCountdown(
   days: number,
   hours: number,
   minutes: number,
-  seconds: number
+  seconds: number,
 ) {
   if (days > 0) {
     return `${days}d ${String(hours).padStart(2, '0')}h`
   }
 
   return `${String(hours).padStart(2, '0')}:${String(
-    minutes
+    minutes,
   ).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
@@ -152,7 +155,6 @@ function LotCard({
     >
       {/* Image */}
       <div className="relative h-56 overflow-hidden">
-
         <img
           src={lot.image}
           alt={lot.title}
@@ -183,7 +185,7 @@ function LotCard({
 
         {/* Status */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                <span
+          <span
             className="px-2 py-1 rounded-sm text-[8px] font-black tracking-widest"
             style={{
               background: isLive
@@ -206,12 +208,10 @@ function LotCard({
               lot.status || 'AUCTION'
             )}
           </span>
-
         </div>
 
         {/* Bottom title */}
         <div className="absolute bottom-4 left-4 right-4">
-
           <p className="text-white font-black text-lg leading-tight">
             {lot.title}
           </p>
@@ -219,24 +219,19 @@ function LotCard({
           <p className="text-[10px] text-white/45 mt-1 line-clamp-1">
             {lot.subtitle}
           </p>
-
         </div>
       </div>
 
       {/* Content */}
       <div className="p-4 space-y-4">
-
         {/* Source */}
         <div className="flex items-center justify-between">
-
           <div className="flex items-center gap-2">
-
             <div
               className="w-1.5 h-1.5 rounded-full"
               style={{
                 background: GOLD,
-                boxShadow:
-                  '0 0 8px rgba(212,175,55,0.6)',
+                boxShadow: '0 0 8px rgba(212,175,55,0.6)',
               }}
             />
 
@@ -246,7 +241,6 @@ function LotCard({
             >
               {lot.source || 'GLOBAL AUCTION'}
             </span>
-
           </div>
 
           {lot.currency && (
@@ -254,12 +248,10 @@ function LotCard({
               {lot.currency}
             </span>
           )}
-
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-2">
-
           <div
             className="p-3 rounded-sm"
             style={{
@@ -295,10 +287,7 @@ function LotCard({
               className="text-[8px] tracking-widest font-bold uppercase"
               style={{ color: GOLD_DIM }}
             >
-              <Clock
-                size={8}
-                className="inline mr-1"
-              />
+              <Clock size={8} className="inline mr-1" />
               TIME
             </p>
 
@@ -310,18 +299,15 @@ function LotCard({
                 countdown.days,
                 countdown.hours,
                 countdown.minutes,
-                countdown.seconds
+                countdown.seconds,
               )}
             </p>
           </div>
-
         </div>
 
         {/* Bottom information */}
         <div className="flex items-center justify-between">
-
           <div className="flex items-center gap-2">
-
             <Gavel
               size={11}
               style={{ color: GOLD_DIM }}
@@ -332,9 +318,9 @@ function LotCard({
                 ? `${lot.bids} bids`
                 : 'Auction data'}
             </span>
-
           </div>
-                  <motion.span
+
+          <motion.span
             whileHover={{ x: 2 }}
             className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
             style={{ color: GOLD }}
@@ -342,9 +328,7 @@ function LotCard({
             VIEW LOT
             <ExternalLink size={9} />
           </motion.span>
-
         </div>
-
       </div>
     </motion.div>
   )
@@ -356,20 +340,33 @@ export default function AuctionDirectory({
 }: AuctionDirectoryProps) {
   const [activeTab, setActiveTab] =
     useState<AuctionCategory>('ALL')
+    const [searchQuery, setSearchQuery] = useState('')
 
-  const filteredLots =
-    activeTab === 'ALL'
-      ? lots
-      : lots.filter(
-          lot => lot.category === activeTab
-        )
+  const filteredLots = lots.filter(lot => {
+  const matchesCategory =
+    activeTab === 'ALL' ||
+    lot.category === activeTab
+
+  const query = searchQuery.trim().toLowerCase()
+
+  const matchesSearch = [
+    lot.title,
+    lot.subtitle,
+    lot.category,
+    lot.source,
+  ]
+    .filter(Boolean)
+    .some(value =>
+      String(value).toLowerCase().includes(query)
+    )
+
+  return matchesCategory && (!query || matchesSearch)
+})
 
   return (
     <div className="space-y-6">
-
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-
         <div>
           <p
             className="text-[9px] tracking-[0.25em] font-bold uppercase mb-2"
@@ -394,23 +391,48 @@ export default function AuctionDirectory({
         >
           {filteredLots.length} LOTS
         </div>
-
       </div>
 
-      {/* Categories */}
-      <div
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-      >
-        {TABS.map(tab => {
+      {/* Search */}
+<div
+  className="flex items-center gap-3 px-3.5 py-3 rounded-sm"
+  style={{
+    background: 'rgba(255,255,255,0.025)',
+    border: '1px solid rgba(212,175,55,0.14)',
+  }}
+>
+  <Search size={14} style={{ color: GOLD_DIM }} />
 
+  <input
+    type="text"
+    value={searchQuery}
+    onChange={event => setSearchQuery(event.target.value)}
+    placeholder="Search auctions, cars, watches..."
+    className="flex-1 min-w-0 bg-transparent text-xs text-white outline-none placeholder:text-white/30"
+    aria-label="Search auction lots"
+  />
+
+  {searchQuery && (
+    <button
+      type="button"
+      onClick={() => setSearchQuery('')}
+      style={{ color: GOLD_DIM }}
+      aria-label="Clear search"
+    >
+      <X size={14} />
+    </button>
+  )}
+</div>
+
+      {/* Categories */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {TABS.map(tab => {
           const active = activeTab === tab
 
           const count =
             tab === 'ALL'
               ? lots.length
-              : lots.filter(
-                  lot => lot.category === tab
-                ).length
+              : lots.filter(lot => lot.category === tab).length
 
           return (
             <button
@@ -435,9 +457,7 @@ export default function AuctionDirectory({
 
               <span
                 className="ml-1.5 text-[8px]"
-                style={{
-                  opacity: 0.5,
-                }}
+                style={{ opacity: 0.5 }}
               >
                 {count}
               </span>
@@ -465,13 +485,10 @@ export default function AuctionDirectory({
           className="rounded-xl py-16 text-center"
           style={{
             background: CARD_BG,
-            border:
-              '1px solid rgba(212,175,55,0.10)',
+            border: '1px solid rgba(212,175,55,0.10)',
           }}
         >
-          <div className="text-3xl mb-3">
-            ◇
-          </div>
+          <div className="text-3xl mb-3">◇</div>
 
           <p className="text-sm font-bold text-white/60">
             No auction lots available
@@ -483,7 +500,6 @@ export default function AuctionDirectory({
           </p>
         </div>
       )}
-
     </div>
   )
 }
