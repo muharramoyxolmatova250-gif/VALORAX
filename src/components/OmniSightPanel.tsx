@@ -14,6 +14,8 @@ type AnalysisResponse = {
     verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
     confidence: number
     summary: string
+    provider_usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null
+    web_search_call_count: number
     conflicts: Array<{ topic: string; evidence_a: string; evidence_b: string; significance: string }>
     source_assessments: Array<{ source: string; finding: string; reliability: 'strong' | 'medium' | 'weak' | 'unknown' }>
     unknowns: string[]
@@ -395,6 +397,18 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                 <span className="text-[10px] text-white/30">{new Date(analysisResult.checkedAt).toLocaleString()}</span>
               </div>
               <p className="text-sm leading-relaxed text-white/80">{analysisResult.analysis.summary}</p>
+              <section className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                <h3 className="text-[10px] font-bold tracking-[0.18em] text-white/55">API USAGE & COST TRANSPARENCY</h3>
+                {analysisResult.analysis.provider_usage ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+                    <div><span className="block text-white/35">Input tokens</span><span className="text-white">{analysisResult.analysis.provider_usage.input_tokens.toLocaleString()}</span></div>
+                    <div><span className="block text-white/35">Output tokens</span><span className="text-white">{analysisResult.analysis.provider_usage.output_tokens.toLocaleString()}</span></div>
+                    <div><span className="block text-white/35">Total tokens</span><span className="text-white">{analysisResult.analysis.provider_usage.total_tokens.toLocaleString()}</span></div>
+                    <div><span className="block text-white/35">Web-search calls</span><span className="text-[#D4AF37]">{analysisResult.analysis.web_search_call_count}</span></div>
+                  </div>
+                ) : <p className="mt-2 text-xs text-white/45">Provider token usage was not exposed for this response.</p>}
+                <p className="mt-2 text-[10px] leading-relaxed text-white/35">Actual currency cost is not estimated here because it depends on the configured model, search calls and current provider pricing. Check the OpenAI project usage dashboard.</p>
+              </section>
               <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                 <h3 className="text-[10px] font-bold tracking-[0.18em] text-[#D4AF37]">SERVER VERDICT EVIDENCE GATE</h3>
                 <p className="mt-2 text-xs leading-relaxed text-white/60">{analysisResult.verdict_guard.policy}</p>
