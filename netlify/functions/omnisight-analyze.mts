@@ -10,6 +10,39 @@ type IncomingEvidence = {
   createdAt: string
 }
 
+
+type IntelligenceFinding = {
+  status: 'SUPPORTED' | 'PARTIAL' | 'NOT_FOUND' | 'CONFLICT' | 'NOT_APPLICABLE'
+  summary: string
+  findings: string[]
+  evidence_refs: string[]
+  confidence: number
+  limitations: string[]
+  next_actions: string[]
+}
+
+type IntelligenceModuleReport = {
+  negative_space: IntelligenceFinding
+  counterfactual_reasoning: IntelligenceFinding
+  cross_asset_connections: IntelligenceFinding
+  evidence_conflict_engine: IntelligenceFinding
+  unknown_asset_hypotheses: IntelligenceFinding
+  acquisition_intelligence: IntelligenceFinding
+  rarity_intelligence: IntelligenceFinding
+  valuation_intelligence: IntelligenceFinding
+}
+
+type ServiceLayer = { summary: string; priorities: string[]; limitations: string[] }
+type AdvancedAnalysisFunctions = {
+  hidden_history: IntelligenceFinding
+  market_illusion: IntelligenceFinding
+  provenance_gaps: IntelligenceFinding
+  rarity_deception: IntelligenceFinding
+  negotiation_intelligence: IntelligenceFinding
+  counterfactual_history: IntelligenceFinding
+  private_knowledge_discovery: IntelligenceFinding
+}
+
 type AnalysisResult = {
   verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
   confidence: number
@@ -18,6 +51,9 @@ type AnalysisResult = {
   source_assessments: Array<{ source: string; finding: string; reliability: 'strong' | 'medium' | 'weak' | 'unknown' }>
   unknowns: string[]
   next_checks: string[]
+  intelligence: IntelligenceModuleReport
+  service_layers: { global_asset_discovery: ServiceLayer; private_collector_intelligence: ServiceLayer }
+  advanced_analysis: AdvancedAnalysisFunctions
 }
 
 const WINDOW_MS = 60_000
@@ -212,6 +248,25 @@ export default async (request: Request) => {
     'Never upgrade a claim to verified merely because the car looks genuine, the seller is prestigious, the listing is expensive, or several websites repeat the same unsourced statement.',
     'Use GOOD only for the consistency of the specific claims reviewed, BAD only for a material evidence-backed contradiction or red flag, and UNCERTAIN whenever identity or evidence remains unresolved. State clearly that none of these verdicts authenticates the physical asset.',
     'Do not invent facts, sources, URLs, dates or confidence. If a claim cannot be independently checked, say so.',
+    'Also complete all eight intelligence modules, both service layers and all seven advanced analysis functions in the required JSON structure. Do not leave modules as generic marketing copy: each must state its actual finding, evidence references, confidence, limitations and next actions.',
+    'NEGATIVE-SPACE: define which records would normally be expected for this asset class and identity, state exactly what was searched, and label only NOT_FOUND_IN_SEARCH when absent. Never infer fraud from absence.',
+    'COUNTERFACTUAL: clearly label scenarios as hypothetical; explain which evidence would support or reject each scenario. Never state a counterfactual as historical fact.',
+    'CROSS-ASSET: report a connection only when a source links the exact entities; distinguish shared event, shared owner, shared identifier and mere similarity.',
+    'EVIDENCE-CONFLICT: compare exact claim, asset identity, source date and source independence; preserve unresolved disagreement.',
+    'UNKNOWN-ASSET-HYPOTHESES: offer ranked hypotheses only as hypotheses, with disconfirming evidence and tests.',
+    'ACQUISITION: provide buyer diligence considerations, not a buy recommendation or investment advice.',
+    'RARITY: separate factory production, surviving examples, specification rarity and seller marketing claims; do not infer survival counts from production counts.',
+    'VALUATION: separate asking prices from completed sales; state currency, sale date, condition/specification comparability and sample limitations. Never invent a valuation.',
+    'GLOBAL ASSET DISCOVERY service layer: summarise discoverable public records, source coverage and unresolved discovery leads.',
+    'PRIVATE COLLECTOR INTELLIGENCE service layer: summarise discreet buyer-side diligence priorities using only lawful public or user-provided information; do not imply access to private databases.',
+    'HIDDEN HISTORY: trace prior owners, events and modifications only where sourced.',
+    'MARKET ILLUSION: identify duplicate listings, stale asks, unsold lots and the difference between asking and realised prices.',
+    'PROVENANCE GAPS: identify timeline intervals and document-chain gaps without treating gaps as proof of wrongdoing.',
+    'RARITY DECEPTION: test limited-edition and special-version claims against primary or specialist records.',
+    'NEGOTIATION INTELLIGENCE: identify evidence-backed price discussion points, not fabricated leverage.',
+    'COUNTERFACTUAL HISTORY: outline alternative scenarios with confidence and evidence needed.',
+    'PRIVATE KNOWLEDGE DISCOVERY: connect scattered public records and clearly mark leads requiring human verification.',
+    'For every finding use status SUPPORTED, PARTIAL, NOT_FOUND, CONFLICT or NOT_APPLICABLE. NOT_FOUND means not located in this search, not that the record does not exist. evidence_refs must point to citation URLs returned by web search; use an empty array when no citation supports the finding.
     'Return a concise analysis and list the most important next checks.',
     '',
     'ASSET:',
@@ -278,8 +333,11 @@ export default async (request: Request) => {
                 },
                 unknowns: { type: 'array', items: { type: 'string' } },
                 next_checks: { type: 'array', items: { type: 'string' } },
+                intelligence: {"type":"object","additionalProperties":false,"properties":{"negative_space":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"counterfactual_reasoning":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"cross_asset_connections":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"evidence_conflict_engine":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"unknown_asset_hypotheses":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"acquisition_intelligence":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"rarity_intelligence":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"valuation_intelligence":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]}},"required":["negative_space","counterfactual_reasoning","cross_asset_connections","evidence_conflict_engine","unknown_asset_hypotheses","acquisition_intelligence","rarity_intelligence","valuation_intelligence"]},
+                service_layers: {"type":"object","additionalProperties":false,"properties":{"global_asset_discovery":{"type":"object","additionalProperties":false,"properties":{"summary":{"type":"string"},"priorities":{"type":"array","items":{"type":"string"}},"limitations":{"type":"array","items":{"type":"string"}}},"required":["summary","priorities","limitations"]},"private_collector_intelligence":{"type":"object","additionalProperties":false,"properties":{"summary":{"type":"string"},"priorities":{"type":"array","items":{"type":"string"}},"limitations":{"type":"array","items":{"type":"string"}}},"required":["summary","priorities","limitations"]}},"required":["global_asset_discovery","private_collector_intelligence"]},
+                advanced_analysis: {"type":"object","additionalProperties":false,"properties":{"hidden_history":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"market_illusion":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"provenance_gaps":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"rarity_deception":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"negotiation_intelligence":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"counterfactual_history":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]},"private_knowledge_discovery":{"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["SUPPORTED","PARTIAL","NOT_FOUND","CONFLICT","NOT_APPLICABLE"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},"evidence_refs":{"type":"array","items":{"type":"string"}},"confidence":{"type":"number","minimum":0,"maximum":1},"limitations":{"type":"array","items":{"type":"string"}},"next_actions":{"type":"array","items":{"type":"string"}}},"required":["status","summary","findings","evidence_refs","confidence","limitations","next_actions"]}},"required":["hidden_history","market_illusion","provenance_gaps","rarity_deception","negotiation_intelligence","counterfactual_history","private_knowledge_discovery"]},
               },
-              required: ['verdict', 'confidence', 'summary', 'conflicts', 'source_assessments', 'unknowns', 'next_checks'],
+              required: ['verdict', 'confidence', 'summary', 'conflicts', 'source_assessments', 'unknowns', 'next_checks', 'intelligence', 'service_layers', 'advanced_analysis'],
             },
           },
         },
