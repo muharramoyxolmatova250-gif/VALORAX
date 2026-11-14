@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
 
@@ -18,22 +19,20 @@ const statusLabels: Record<EvidenceStatus, string> = {
 }
 
 export default function OmniSightPanel({ open, onClose }: Props) {
-  const [records, setRecords] = useState<EvidenceRecord[]>([])
+  const [records, setRecords] = useState<EvidenceRecord[]>(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY)
+      return saved ? (JSON.parse(saved) as EvidenceRecord[]) : []
+    } catch {
+      return []
+    }
+  })
   const [assetName, setAssetName] = useState('')
   const [claim, setClaim] = useState('')
   const [sourceName, setSourceName] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
   const [status, setStatus] = useState<EvidenceStatus>('seller_claim')
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY)
-      if (saved) setRecords(JSON.parse(saved) as EvidenceRecord[])
-    } catch {
-      setError('Saved local evidence could not be read.')
-    }
-  }, [])
 
   useEffect(() => {
     try {
@@ -47,7 +46,7 @@ export default function OmniSightPanel({ open, onClose }: Props) {
 
   if (!open) return null
 
-  const addRecord = (event: React.FormEvent<HTMLFormElement>) => {
+  const addRecord = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
     if (!assetName.trim() || !claim.trim() || !sourceName.trim()) {
