@@ -27,5 +27,5 @@ test('does not invent searched domains when there are no citation annotations', 
   assert.deepEqual(audit.searched_source_domains, [])
   assert.deepEqual(audit.search_queries, [])
   assert.equal(audit.expected_trace_count, 0)
-  assert.match(audit.limitations[2], /Search query strings are recorded only/)
+  assert.match(audit.limitations[2], /Only web_search_call actions/)
 })
