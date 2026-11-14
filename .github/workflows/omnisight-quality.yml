@@ -27,7 +27,7 @@ jobs:
       - name: Test OMNISIGHT evidence guard
         run: npm run test:omnisight
       - name: Type-check OMNISIGHT frontend
-        run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --skipLibCheck --lib ES2020,DOM --jsx react-jsx --strict --types node src/components/OmniSightPanel.tsx src/omnisight/evidence.ts src/omnisight/intelligence.ts
+        run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --skipLibCheck --lib ES2020,DOM --jsx react-jsx --strict --types node src/components/OmniSightPanel.tsx src/omnisight/evidence.ts src/omnisight/intelligence.ts src/vite-env.d.ts
       - name: Type-check Netlify functions
         run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --skipLibCheck --lib ES2020,DOM --types node netlify/functions/omnisight-analyze.mts netlify/functions/lib/intelligence-guard.mts netlify/functions/lib/omnisight-db.mts
       - name: Build production frontend
