@@ -12,7 +12,7 @@ test('reports absent submitted evidence as a gap, not as proof a record does not
   assert.ok(audit.searched_source_domains.includes('example-auction.com'))
   assert.match(audit.limitations[0], /not evidence of fraud/)
   assert.match(audit.search_scope[2], /does not prove/)
-  assert.deepEqual(audit.search_queries, ['Pagani Huayra R chassis history', 'Pagani Huayra R chassis history'])
+  assert.deepEqual(audit.search_queries, ['Pagani Huayra R chassis history'])
 })
 
 test('does not invent searched domains when there are no citation annotations', () => {
@@ -20,5 +20,5 @@ test('does not invent searched domains when there are no citation annotations', 
   assert.deepEqual(audit.searched_source_domains, [])
   assert.deepEqual(audit.search_queries, [])
   assert.equal(audit.expected_trace_count, 0)
-  assert.match(audit.limitations[2], /does not retain a query-by-query/)
+  assert.match(audit.limitations[2], /Search query strings are recorded only/)
 })
