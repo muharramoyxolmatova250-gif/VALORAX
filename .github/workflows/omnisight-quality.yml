@@ -1,0 +1,32 @@
+name: OMNISIGHT quality gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/omnisight-server-ai-v0-1]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build and type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type-check application
+        run: npx tsc --noEmit
+      - name: Type-check Netlify functions
+        run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --skipLibCheck --lib ES2020,DOM --types node netlify/functions/omnisight-analyze.mts netlify/functions/lib/intelligence-guard.mts
+      - name: Build production frontend
+        run: npm run build
