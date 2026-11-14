@@ -87,6 +87,59 @@ function safeHost(raw: string) {
   try { return new URL(raw).hostname.toLowerCase().replace(/^www\./, '') } catch { return '' }
 }
 
+export type CuratedMarketSale = {
+  make: string
+  model: string
+  model_year: number | null
+  chassis_identifier: string | null
+  production_serial: string | null
+  auction_house: string
+  auction_name: string
+  lot_number: string | null
+  sale_date: string | null
+  event_start: string | null
+  event_end: string | null
+  location: string | null
+  sale_amount: number
+  currency: string
+  result_status: 'sold' | 'unsold' | 'withdrawn'
+  source_url: string
+  source_title: string
+}
+
+export async function fetchCuratedMarketSales(db: OmnisightDb, assetName: string) {
+  const normalized = assetName.toLowerCase()
+  let make = ''
+  let model = ''
+  if (normalized.includes('pagani') && normalized.includes('huayra r')) {
+    make = 'Pagani'
+    model = 'Huayra R'
+  } else if (normalized.includes('ferrari')) {
+    make = 'Ferrari'
+  } else if (normalized.includes('bugatti')) {
+    make = 'Bugatti'
+  } else if (normalized.includes('porsche')) {
+    make = 'Porsche'
+  } else if (normalized.includes('mclaren')) {
+    make = 'McLaren'
+  } else if (normalized.includes('lamborghini')) {
+    make = 'Lamborghini'
+  }
+  if (!make) return { records: [] as CuratedMarketSale[], queryState: 'make_not_recognized' as const }
+
+  let query = db.from('omnisight_market_sales')
+    .select('make,model,model_year,chassis_identifier,production_serial,auction_house,auction_name,lot_number,sale_date,event_start,event_end,location,sale_amount,currency,result_status,source_url,source_title')
+    .eq('make', make)
+    .eq('verification_status', 'verified')
+    .in('data_use_status', ['licensed', 'public_domain', 'permission_granted'])
+    .order('sale_date', { ascending: false })
+    .limit(25)
+  if (model) query = query.eq('model', model)
+  const { data, error } = await query
+  if (error) throw new Error('OMNISIGHT_MARKET_DATA_QUERY_FAILED')
+  return { records: (data || []) as CuratedMarketSale[], queryState: data?.length ? 'rights_cleared_records_found' as const : 'no_rights_cleared_records' as const }
+}
+
 export async function persistOmnisightResearch(
   db: OmnisightDb,
   userId: string,
