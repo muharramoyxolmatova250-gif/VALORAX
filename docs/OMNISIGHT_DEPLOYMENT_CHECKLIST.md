@@ -66,7 +66,21 @@ After setting or changing environment variables, trigger a new Netlify deploy so
 8. Confirm the report does not claim physical authentication, legal title or condition verification.
 9. Save the analysis ID and record any incorrect joins, unsupported claims or missing citations.
 
-## 6. Quotas and cost controls
+## 6. Run the authenticated Pagani live smoke test
+
+After the two Supabase migrations are applied, Auth email login works, and the deployed Netlify function has its server-only secrets:
+1. Sign in to VALORAX and obtain a short-lived Supabase access token from the authenticated session.
+2. In a local terminal only, set:
+   - `OMNISIGHT_BASE_URL` to the deployed VALORAX origin.
+   - `OMNISIGHT_TEST_ACCESS_TOKEN` to the access token.
+3. Run `npm run omnisight:live-pagani`.
+4. Do not paste the access token into chat, issue comments, logs or source files.
+5. Review the returned analysis ID, verdict, citations, graph links and every material Pagani claim manually.
+6. This request consumes one monthly credit and incurs a real OpenAI API request cost.
+
+The smoke test checks response shape, typed VIN/serial separation, source-lineage and negative-space outputs, market summary, persistence and usage quota. A passing smoke test does not establish factual correctness; source-by-source human review is mandatory.
+
+## 7. Quotas and cost controls
 
 - Current hard monthly limit: 10 analysis attempts per authenticated user.
 - Persistent database rate limiter: up to 3 requests per authenticated user per 60-second window across serverless instances.
@@ -76,7 +90,7 @@ After setting or changing environment variables, trigger a new Netlify deploy so
 - Failed AI calls consume an attempt; this prevents repeated free retries.
 - These are initial controls, not a complete billing or abuse-management system. Monitor OpenAI usage and Netlify logs.
 
-## 7. Release conditions
+## 8. Release conditions
 
 Do not merge or announce production readiness until:
 - the SQL migration has been applied successfully;
