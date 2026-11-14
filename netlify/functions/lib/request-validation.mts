@@ -36,13 +36,9 @@ function safeEvidenceUrl(raw: string): boolean {
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return false
     const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
     if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false
-    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return false
-    const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-    if (ipv4) {
-      const [a,b] = ipv4.slice(1).map(Number)
-      if (ipv4.slice(1).some(part => Number(part) > 255) || a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return false
-    }
-    if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) return false
+    // Evidence URLs are references only. Reject all IP literals, including private,
+    // loopback, link-local and mapped-IPv6 forms, to avoid numeric-address edge cases.
+    if (host.startsWith('[') || /^\\d+(?:\\.\\d+){0,3}$/.test(host)) return false
     return true
   } catch {
     return false
