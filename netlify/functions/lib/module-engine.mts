@@ -20,6 +20,7 @@ export type ModuleSignal = {
   evidence_record_ids: string[]
   limitations: string[]
   conflicts?: Array<{ attribute: string; values: string[]; record_ids: string[]; source_domains: string[] }>
+  connections?: CrossAssetLink[]
 }
 export type CrossAssetLink = {
   related_asset: string
