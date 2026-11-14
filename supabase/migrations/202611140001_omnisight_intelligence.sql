@@ -3,9 +3,42 @@
 
 create extension if not exists pgcrypto;
 
+-- Shared public-asset index. Only server-curated public research metadata is written here.
+create table if not exists public.omnisight_global_assets (
+  id uuid primary key default gen_random_uuid(),
+  display_name text not null,
+  canonical_key text not null unique,
+  asset_class text not null default 'unclassified',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.omnisight_global_sources (
+  id uuid primary key default gen_random_uuid(),
+  domain text not null unique,
+  display_name text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.omnisight_global_asset_sources (
+  id uuid primary key default gen_random_uuid(),
+  global_asset_id uuid not null references public.omnisight_global_assets(id) on delete cascade,
+  global_source_id uuid not null references public.omnisight_global_sources(id) on delete cascade,
+  source_url text not null,
+  source_title text not null,
+  source_kind text not null default 'web_search_citation',
+  evidence_state text not null default 'search_returned' check (evidence_state in ('search_returned','human_reviewed','rejected')),
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  unique(global_asset_id, source_url)
+);
+
+create index if not exists omnisight_global_asset_sources_source_idx on public.omnisight_global_asset_sources(global_source_id, last_seen_at desc);
+
 create table if not exists public.omnisight_assets (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
+  global_asset_id uuid references public.omnisight_global_assets(id) on delete set null,
   display_name text not null,
   canonical_key text not null,
   asset_class text not null default 'unclassified',
@@ -152,6 +185,9 @@ $$;
 revoke all on function public.omnisight_consume_monthly_credit(uuid, integer) from public, anon, authenticated;
 grant execute on function public.omnisight_consume_monthly_credit(uuid, integer) to service_role;
 
+alter table public.omnisight_global_assets enable row level security;
+alter table public.omnisight_global_sources enable row level security;
+alter table public.omnisight_global_asset_sources enable row level security;
 alter table public.omnisight_assets enable row level security;
 alter table public.omnisight_evidence enable row level security;
 alter table public.omnisight_analyses enable row level security;
@@ -159,6 +195,13 @@ alter table public.omnisight_entities enable row level security;
 alter table public.omnisight_relationships enable row level security;
 alter table public.omnisight_market_sales enable row level security;
 alter table public.omnisight_usage_monthly enable row level security;
+
+drop policy if exists "signed-in users read global assets" on public.omnisight_global_assets;
+create policy "signed-in users read global assets" on public.omnisight_global_assets for select to authenticated using (true);
+drop policy if exists "signed-in users read global sources" on public.omnisight_global_sources;
+create policy "signed-in users read global sources" on public.omnisight_global_sources for select to authenticated using (true);
+drop policy if exists "signed-in users read global asset source links" on public.omnisight_global_asset_sources;
+create policy "signed-in users read global asset source links" on public.omnisight_global_asset_sources for select to authenticated using (evidence_state <> 'rejected');
 
 -- User-facing direct reads are scoped to the signed-in owner.
 drop policy if exists "owner reads own omnisight assets" on public.omnisight_assets;
