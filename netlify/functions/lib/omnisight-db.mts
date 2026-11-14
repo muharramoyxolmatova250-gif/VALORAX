@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { extractGraphCandidates } from './graph-extract.mjs'
 
 export type OmnisightDb = SupabaseClient
 
@@ -256,6 +257,9 @@ export async function persistOmnisightResearch(
   }
 
   const entities = new Map<string, { entity_type: string; canonical_key: string; label: string; attributes: Record<string, unknown> }>()
+  const graphCandidates = input.records.flatMap(record => extractGraphCandidates({
+    id: record.id, claim: record.claim, sourceName: record.sourceName, sourceUrl: record.sourceUrl,
+  }))
   entities.set('asset:' + assetKey, {
     entity_type: 'asset', canonical_key: assetKey, label: input.assetName, attributes: { asset_id: asset.id },
   })
@@ -278,6 +282,21 @@ export async function persistOmnisightResearch(
     }
   }
 
+  for (const candidate of graphCandidates) {
+    const key = candidate.entity_type + ':' + candidate.canonical_key
+    const current = entities.get(key)
+    entities.set(key, {
+      entity_type: candidate.entity_type,
+      canonical_key: candidate.canonical_key,
+      label: candidate.label,
+      attributes: {
+        ...(current?.attributes ?? {}),
+        ...candidate.attributes,
+        extraction_state: 'candidate_only',
+      },
+    })
+  }
+
   for (const citation of input.citations) {
     const host = safeHost(citation.url)
     if (host) entities.set('source:' + host, {
@@ -295,6 +314,22 @@ export async function persistOmnisightResearch(
   const entityIds = new Map(savedEntities.map(entity => [entity.entity_type + ':' + entity.canonical_key, entity.id]))
   const relationships: Array<Record<string, unknown>> = []
   const evidenceByClientId = new Map(evidence.map(row => [row.client_record_id, row.id]))
+  for (const candidate of graphCandidates) {
+    const evidenceId = evidenceByClientId.get(candidate.evidence_record_id)
+    const targetId = entityIds.get(candidate.entity_type + ':' + candidate.canonical_key)
+    if (!evidenceId || !targetId) continue
+    relationships.push({
+      owner_id: userId,
+      from_entity_id: assetIdsafe(entityIds, assetKey),
+      to_entity_id: targetId,
+      relationship_type: candidate.relationship_type,
+      evidence_id: evidenceId,
+      analysis_id: savedAnalysis.id,
+      confidence: 0,
+      review_status: 'candidate',
+    })
+  }
+
   for (const record of input.records) {
     const evidenceId = evidenceByClientId.get(record.id)
     if (!evidenceId) continue
@@ -349,7 +384,7 @@ export async function persistOmnisightResearch(
     if (relationError) throw new Error('OMNISIGHT_GRAPH_RELATION_PERSIST_FAILED')
   }
 
-  return { globalAssetId: globalAsset?.id ?? null, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
+  return { globalAssetId: globalAsset?.id ?? null, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, discoveredGraphCandidateCount: graphCandidates.length, globalSourceCount }
 }
 
 function assetIdsafe(entityIds: Map<string, string>, assetKey: string) {
