@@ -1,22 +1,12 @@
 import type { Config } from '@netlify/functions'
 import { buildDeterministicModuleReport } from './lib/module-engine.mjs'
+import { validateResearchRequest } from './lib/request-validation.mjs'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
 import { summarizeComparableSales } from './lib/market-intelligence.mjs'
 import { extractOpenAiResponse } from './lib/openai-response.mjs'
 import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
-
-type IncomingEvidence = {
-  id: string
-  assetName: string
-  claim: string
-  sourceName: string
-  sourceUrl: string
-  status: string
-  createdAt: string
-}
-
 
 type IntelligenceFinding = {
   status: 'SUPPORTED' | 'PARTIAL' | 'NOT_FOUND' | 'CONFLICT' | 'NOT_APPLICABLE'
@@ -72,15 +62,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { 'Cache-Control': 'no-store' },
   })
-}
-
-function isRecord(value: unknown): value is IncomingEvidence {
-  if (!value || typeof value !== 'object') return false
-  const item = value as Record<string, unknown>
-  const stringFields = ['id', 'assetName', 'claim', 'sourceName', 'sourceUrl', 'status', 'createdAt']
-  if (!stringFields.every(key => typeof item[key] === 'string')) return false
-  return ['seller_claim', 'source_observed', 'independently_corroborated', 'disputed', 'unknown']
-    .includes(item.status as string)
 }
 
 function cleanText(value: string, max: number) {
@@ -295,51 +276,17 @@ export default async (request: Request) => {
   const model = process.env.OMNISIGHT_MODEL
   if (!apiKey || !model) return json({ error: 'Server AI key or model is not configured.' }, 503)
 
-  let body: { assetName?: unknown; records?: unknown }
+  let validated
   try {
     const rawBody = await request.text()
-    if (new TextEncoder().encode(rawBody).byteLength > 40_000) {
-      return json({ error: 'Request is too large.' }, 413)
-    }
-    body = JSON.parse(rawBody) as { assetName?: unknown; records?: unknown }
-  } catch {
-    return json({ error: 'Invalid JSON request.' }, 400)
+    const validation = validateResearchRequest(rawBody)
+    if (!validation.ok) return json({ error: validation.error }, validation.status)
+    validated = validation.value
+  } catch (error) {
+    console.error('OMNISIGHT request validation failed:', error instanceof Error ? error.message : 'unknown')
+    return json({ error: 'Could not validate the research request.' }, 400)
   }
-
-  if (typeof body.assetName !== 'string' || !Array.isArray(body.records)) {
-    return json({ error: 'Asset name and evidence records are required.' }, 400)
-  }
-  if (body.records.length < 1 || body.records.length > 12 || !body.records.every(isRecord)) {
-    return json({ error: 'Provide between 1 and 12 valid evidence records.' }, 400)
-  }
-
-  const assetName = cleanText(body.assetName, 180)
-  if (!assetName) return json({ error: 'Asset name cannot be empty.' }, 400)
-
-  const records = body.records.map(record => ({
-    id: cleanText(record.id, 80),
-    assetName: cleanText(record.assetName, 180),
-    claim: cleanText(record.claim, 1200),
-    sourceName: cleanText(record.sourceName, 180),
-    sourceUrl: cleanText(record.sourceUrl, 1000),
-    status: cleanText(record.status, 40),
-    recordedAt: cleanText(record.createdAt, 40),
-  }))
-
-  if (records.some(record => record.assetName !== assetName)) {
-    return json({ error: 'All evidence records must refer to the same exact asset name.' }, 400)
-  }
-  for (const record of records) {
-    if (!record.sourceUrl) continue
-    try {
-      const sourceUrl = new URL(record.sourceUrl)
-      if (!['http:', 'https:'].includes(sourceUrl.protocol)) {
-        return json({ error: 'Evidence source URLs must use HTTP or HTTPS.' }, 400)
-      }
-    } catch {
-      return json({ error: 'One or more evidence source URLs are invalid.' }, 400)
-    }
-  }
+  const { assetName, records } = validated
 
   let quota
   try {
