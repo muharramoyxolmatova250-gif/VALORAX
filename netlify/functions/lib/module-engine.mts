@@ -19,6 +19,7 @@ export type ModuleSignal = {
   checks: string[]
   evidence_record_ids: string[]
   limitations: string[]
+  conflicts?: Array<{ attribute: string; values: string[]; record_ids: string[]; source_domains: string[] }>
 }
 export type DeterministicModuleReport = {
   generated_by: 'deterministic_rules_v1'
@@ -36,6 +37,22 @@ export type DeterministicModuleReport = {
 const make = (module: string, state: ModuleSignal['state'], observations: string[], checks: string[], ids: string[] = [], limitations: string[] = []): ModuleSignal =>
   ({ module, state, observations, checks, evidence_record_ids: [...new Set(ids)], limitations })
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
+const extractClaimAttributes = (record: ModuleEvidence) => {
+  const value = record.claim
+  const found: Array<{ attribute: string; value: string }> = []
+  const vin = value.match(/\b[A-HJ-NPR-Z0-9]{17}\b/i)?.[0]
+  if (vin) found.push({ attribute: 'VIN', value: vin.toUpperCase() })
+  const serial = value.match(/\b(?:serial|production number|build number)\s*(?:no\.?|number|#|:)?\s*(\d{1,3}\s*\/\s*\d{1,3})\b/i)?.[1]
+  if (serial) found.push({ attribute: 'production_sequence', value: serial.replace(/\s+/g, '') })
+  const production = value.match(/\b(?:limited to|only|total production of|production of)\s*(\d{1,5})\s*(?:units|cars|examples)?\b/i)?.[1]
+  if (production) found.push({ attribute: 'claimed_production_total', value: production })
+  const year = value.match(/\b(?:model year|built in|manufactured in)\s*(19\d{2}|20\d{2})\b/i)?.[1]
+  if (year) found.push({ attribute: 'stated_build_year', value: year })
+  return found
+}
+const sourceDomain = (url: string) => {
+  try { return new URL(url).hostname.replace(/^www\./i, '').toLowerCase() } catch { return '' }
+}
 
 /**
  * Rule-based checks over the submitted evidence ledger and rights-cleared sale rows.
@@ -56,6 +73,20 @@ export function buildDeterministicModuleReport(input: {
   const conditionIds = ids(/condition|service|maintenance|restoration|repair|inspection/i)
   const legalIds = ids(/title|registration|import|export|customs/i)
   const allDisputed = records.filter(r => r.status === 'disputed')
+  const attributeGroups = new Map<string, Array<{ value: string; id: string; domain: string }>>()
+  for (const record of records) {
+    for (const item of extractClaimAttributes(record)) {
+      const rows = attributeGroups.get(item.attribute) ?? []
+      rows.push({ value: item.value, id: record.id, domain: sourceDomain(record.sourceUrl) })
+      attributeGroups.set(item.attribute, rows)
+    }
+  }
+  const detectedConflicts = [...attributeGroups.entries()].flatMap(([attribute, rows]) => {
+    const values = unique(rows.map(row => row.value))
+    const domains = unique(rows.map(row => row.domain))
+    if (values.length < 2) return []
+    return [{ attribute, values, record_ids: unique(rows.map(row => row.id)), source_domains: domains }]
+  })
   const identifiers = records.flatMap(r => {
     const matches = textOf(r).match(/\b[A-HJ-NPR-Z0-9]{17}\b|\b\d{1,3}\s*\/\s*\d{1,3}\b/gi) ?? []
     return matches.map(v => v.replace(/\s+/g, ''))
@@ -89,10 +120,14 @@ export function buildDeterministicModuleReport(input: {
         ['The submitted ledger is scoped to one named asset; no independently identified second asset is supplied for deterministic linking.'],
         ['Compare exact VIN/serial, owner, event, document and auction identifiers across separately researched assets.', 'Require a source-backed relationship; model-name similarity is not a connection.'],
         [], ['No connection is inferred from shared brand or model name. A persistent multi-asset graph is not queried by this function.']),
-      evidence_conflict_engine: make('Evidence Conflict Engine', allDisputed.length ? 'ACTIONABLE' : 'LIMITED',
-        allDisputed.length ? [`${allDisputed.length} submitted record(s) are explicitly marked disputed and need claim-by-claim comparison.`] : ['No submitted record is explicitly marked disputed. This does not prove all claims agree.'],
-        ['Pair claims about the same attribute and exact asset identifier.', 'Compare source dates, primary/secondary status and source lineage before resolving.', 'Do not resolve a conflict by majority vote among copied sources.'],
-        allDisputed.map(r => r.id), ['A disputed label is a user-supplied workflow status, not an independently detected contradiction.']),
+      evidence_conflict_engine: {
+        ...make('Evidence Conflict Engine', detectedConflicts.length || allDisputed.length ? 'ACTIONABLE' : 'LIMITED',
+          detectedConflicts.length ? detectedConflicts.map(conflict => `Conflicting submitted values for ${conflict.attribute}: ${conflict.values.join(' vs ')}.`) : allDisputed.length ? [`${allDisputed.length} submitted record(s) are explicitly marked disputed; no machine-comparable attribute conflict was extracted.`] : ['No machine-comparable contradiction was detected in the submitted ledger. This does not prove all claims agree.'],
+          ['Compare only claims about the same exact asset and attribute.', 'Check original documents, dates, context and source lineage before resolution.', 'Treat differing values from copied sources as one evidence family, not independent votes.'],
+          unique([...detectedConflicts.flatMap(item => item.record_ids), ...allDisputed.map(r => r.id)]),
+          ['Automatic extraction covers only explicit VIN, production sequence, production-total and stated build-year patterns.', 'A detected value difference is a conflict candidate, not proof that either source is correct.']),
+        conflicts: detectedConflicts,
+      },
       unknown_asset_hypotheses: make('Unknown Asset Hypothesis Generator', uniqueIdentifiers.length > 1 ? 'ACTIONABLE' : 'LIMITED',
         uniqueIdentifiers.length > 1 ? [`The ledger contains ${uniqueIdentifiers.length} distinct identifier-like strings that may need identity reconciliation.`] : ['The ledger does not contain multiple distinct identifier-like strings for hypothesis ranking.'],
         ['Check each candidate identifier against the manufacturer or registry.', 'Keep VIN/chassis, production sequence and auction lot numbers as separate identifier types.', 'Write each explanation as a hypothesis and state what would falsify it.'],
