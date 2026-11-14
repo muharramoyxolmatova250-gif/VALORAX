@@ -28,7 +28,7 @@ test('rejects duplicate evidence IDs and empty claims', () => {
 })
 
 test('rejects credentialed, local and non-http source URLs', () => {
-  for (const sourceUrl of ['javascript:alert(1)', 'https://user:pass@example.com/x', 'http://127.0.0.1/admin', 'http://localhost/x', 'http://192.168.1.1/x']) {
+  for (const sourceUrl of ['javascript:alert(1)', 'https://user:pass@example.com/x', 'http://127.0.0.1/admin', 'http://localhost/x', 'http://192.168.1.1/x', 'http://[::1]/x', 'http://[::ffff:127.0.0.1]/x', 'http://127.1/x']) {
     const result = validateResearchRequest(JSON.stringify(sample({ sourceUrl })))
     assert.equal(result.ok, false, sourceUrl)
   }
