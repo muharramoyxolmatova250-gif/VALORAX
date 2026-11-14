@@ -46,6 +46,7 @@ const checks = [
   ['market summary returned', Array.isArray(payload.market_summary?.currency_groups)],
   ['private analysis persisted', Boolean(payload.persistence?.analysisId)],
   ['usage quota returned', Number.isFinite(payload.usage?.used) && Number.isFinite(payload.usage?.limit)],
+  ['provider token usage returned', Number.isFinite(payload.analysis?.provider_usage?.total_tokens)],
 ]
 
 for (const [label, passed] of checks) {
@@ -56,6 +57,8 @@ console.log('HTTP status:', response.status)
 console.log('Verdict:', payload.analysis.verdict)
 console.log('Confidence:', payload.analysis.confidence)
 console.log('Citation count:', payload.citations?.length ?? 0)
+console.log('Provider tokens:', payload.analysis.provider_usage?.total_tokens ?? 'not exposed')
+console.log('Web-search actions:', payload.analysis.web_search_call_count ?? 'not exposed')
 console.log('Graph nodes/links:', payload.persistence.graphEntityCount, '/', payload.persistence.graphRelationshipCount)
 console.log('Analysis ID:', payload.persistence.analysisId)
 
