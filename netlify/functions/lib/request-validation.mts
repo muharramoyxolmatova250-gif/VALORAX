@@ -38,7 +38,7 @@ function safeEvidenceUrl(raw: string): boolean {
     if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false
     // Evidence URLs are references only. Reject all IP literals, including private,
     // loopback, link-local and mapped-IPv6 forms, to avoid numeric-address edge cases.
-    if (host.startsWith('[') || /^\d+(?:\.\d+){0,3}$/.test(host)) return false
+    if (host.startsWith('[') || host.includes(':') || /^\d+(?:\.\d+){0,3}$/.test(host)) return false
     return true
   } catch {
     return false
