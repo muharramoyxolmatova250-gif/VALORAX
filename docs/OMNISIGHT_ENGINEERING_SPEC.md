@@ -43,6 +43,21 @@ A submitted-ledger coverage result only means a supplied record matched a topic 
 7. Rarity Intelligence — separates factory production, surviving examples, specification rarity and marketing claims.
 8. Valuation Intelligence — distinguishes asking prices from realised sales and states comparability and sample limitations.
 
+## Deterministic eight-module engine (feature branch)
+
+The server now adds a separate `deterministic_modules` report generated from the submitted evidence ledger and the rights-cleared sales rows. It contains eight rule-based module outputs, each with observations, next checks, matched record IDs and explicit limitations. This is separate from the model-guided `intelligence` findings and must not be presented as eight fully autonomous research agents.
+
+- Negative-Space: identifies missing keyword-matched evidence topics in the submitted ledger only.
+- Counterfactual: provides scenario-design and falsification checks; it does not invent alternative history.
+- Cross-Asset: reports no signal when only one asset is supplied; no connection is inferred from similarity.
+- Evidence Conflict: flags records already marked disputed by the submitter; it does not independently prove a contradiction.
+- Unknown Asset Hypotheses: flags multiple identifier-like strings for reconciliation; it does not validate them against a registry.
+- Acquisition: produces a buyer-diligence checklist and coverage indicator; it is not a buy recommendation.
+- Rarity: detects rarity/production language and recommends primary-source checks; it does not certify production or survival counts.
+- Valuation: describes only supplied rights-cleared completed-sale rows, separated by currency; it does not appraise or predict value.
+
+Regression coverage is in `tests/module-engine.test.mts`, included in `npm run test:omnisight`. These tests still need to pass in GitHub Actions before this change is treated as verified.
+
 ## Two service layers
 
 - Global Asset Discovery — public-record coverage and unresolved research leads.
