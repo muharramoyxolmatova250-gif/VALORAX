@@ -9,7 +9,21 @@ import { ADVANCED_ANALYSIS_FUNCTIONS, INTELLIGENCE_MODULES, type IntelligenceFin
 
 const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
 
+type DeterministicModuleSignal = {
+  module: string
+  state: 'ACTIONABLE' | 'LIMITED' | 'NO_SIGNAL'
+  observations: string[]
+  checks: string[]
+  evidence_record_ids: string[]
+  limitations: string[]
+}
+type DeterministicModuleReport = {
+  generated_by: 'deterministic_rules_v1'
+  modules: Record<string, DeterministicModuleSignal>
+}
+
 type AnalysisResponse = {
+  deterministic_modules: DeterministicModuleReport
   analysis: {
     verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
     confidence: number
@@ -512,6 +526,29 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                         <span className={`text-[9px] font-bold tracking-wider ${item.status === 'PRESENT_IN_SUBMITTED_RECORDS' ? 'text-emerald-300' : 'text-amber-200'}`}>{item.status === 'PRESENT_IN_SUBMITTED_RECORDS' ? 'RECORD MATCHED' : 'NO RECORD MATCH'}</span>
                       </div>
                       <p className="mt-2 text-[10px] leading-relaxed text-white/45">{item.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section className="space-y-3 border-t border-[#D4AF37]/20 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">8 DETERMINISTIC MODULE CHECKS</h3>
+                  <span className="text-[9px] tracking-wider text-white/35">RULE ENGINE · {analysisResult.deterministic_modules.generated_by}</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-white/45">Independent rule-based checks over submitted evidence and cleared sale records. These checks do not replace source verification or specialist review.</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {Object.entries(analysisResult.deterministic_modules.modules).map(([key, item]) => (
+                    <div key={key} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-xs font-bold text-white">{item.module}</h4>
+                        <span className={item.state === 'ACTIONABLE' ? 'text-[9px] font-bold tracking-wider text-amber-200' : item.state === 'LIMITED' ? 'text-[9px] font-bold tracking-wider text-white/45' : 'text-[9px] font-bold tracking-wider text-white/35'}>{item.state.replace(/_/g, ' ')}</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {item.observations.map((line, index) => <p key={index} className="text-[10px] leading-relaxed text-white/70">{line}</p>)}
+                      </div>
+                      {item.evidence_record_ids.length > 0 && <p className="mt-2 text-[9px] text-emerald-200/60">MATCHED RECORDS: {item.evidence_record_ids.join(', ')}</p>}
+                      <MiniList title="NEXT CHECKS" items={item.checks} />
+                      <MiniList title="LIMITATIONS" items={item.limitations} />
                     </div>
                   ))}
                 </div>
