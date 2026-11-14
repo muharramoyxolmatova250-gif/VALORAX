@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
-    "test:omnisight": "node --experimental-strip-types --test tests/omnisight-intelligence.test.mts tests/source-lineage.test.mts"
+    "test:omnisight": "node --experimental-strip-types --test tests/omnisight-intelligence.test.mts tests/source-lineage.test.mts tests/graph-extract.test.mts"
   },
   "dependencies": {
     "@netlify/functions": "^6.0.0",
