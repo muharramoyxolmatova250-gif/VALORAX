@@ -123,10 +123,14 @@ export function buildDeterministicModuleReport(input: {
         ['Search manufacturer/factory archives for identity and build records.', 'Request dated ownership, condition and legal documents where relevant.', 'Record each search scope and inaccessible archive separately.'],
         unique([...identityIds, ...factoryIds, ...provenanceIds, ...saleIds, ...conditionIds, ...legalIds]),
         ['This is coverage of submitted records only; it does not establish whether missing records exist elsewhere.', 'Keyword matching is a triage aid, not verification.']),
-      counterfactual_reasoning: make('Counterfactual Reasoning', 'LIMITED',
-        ['No alternative history is asserted as fact by the deterministic engine.', 'Counterfactual scenarios require a clearly defined event or claim to test.'],
-        ['Define one falsifiable alternative scenario.', 'Identify primary records that would support or disconfirm it.', 'Keep hypothetical consequences separate from documented history.'],
-        [], ['This module does not generate historical facts from hypothetical scenarios.']),
+      counterfactual_reasoning: make('Counterfactual Reasoning', detectedConflicts.length ? 'ACTIONABLE' : 'LIMITED',
+        detectedConflicts.length
+          ? detectedConflicts.flatMap(conflict => conflict.values.map(value => `HYPOTHETICAL ONLY: if ${conflict.attribute} = ${value}, reconcile records ${conflict.record_ids.join(', ')} against the manufacturer or original dated record before accepting this scenario.`))
+          : ['No machine-comparable contradiction was available to build a case-specific alternative scenario.', 'No alternative history is asserted as fact by the deterministic engine.'],
+        ['For each scenario, identify a primary record that would support it and a different record that would falsify it.', 'Compare dates, exact asset identifiers and source lineage before drawing consequences.', 'Keep hypothetical outcomes separate from documented history.'],
+        unique(detectedConflicts.flatMap(conflict => conflict.record_ids)),
+        ['Scenarios are conditional reasoning prompts, not claims that an alternative event occurred.', 'Automatic scenarios are limited to explicit identifier, production-count and build-year conflicts.']),
+
       cross_asset_connections: {
         ...make('Cross-Asset Connection Discovery', crossAssetLinks.length ? 'ACTIONABLE' : 'NO_SIGNAL',
           crossAssetLinks.length
