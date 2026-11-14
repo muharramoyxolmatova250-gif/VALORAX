@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { extractGraphCandidates } from './graph-extract.mjs'
+import { extractGraphCandidates } from './graph-extract.mts'
 
 export type OmnisightDb = SupabaseClient
 
