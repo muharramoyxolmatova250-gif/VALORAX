@@ -86,8 +86,15 @@ export async function persistOmnisightResearch(
     model: string
   },
 ) {
-  const assetKey = canonicalKey(input.assetName)
-  if (!assetKey) throw new Error('OMNISIGHT_ASSET_KEY_EMPTY')
+  const submittedIdentifiers = input.records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
+  const exactVins = [...new Set(submittedIdentifiers
+    .filter(item => item.identifier_type === 'vin_or_chassis')
+    .map(item => item.normalized_value))]
+  const modelKey = canonicalKey(input.assetName)
+  if (!modelKey) throw new Error('OMNISIGHT_ASSET_KEY_EMPTY')
+  // Use a chassis/VIN key only when the submitted evidence agrees on exactly one.
+  // Multiple conflicting identifiers stay on a model-level key and remain unresolved.
+  const assetKey = exactVins.length === 1 ? 'identifier-' + exactVins[0].toLowerCase() : 'model-' + modelKey
 
   const assetClass = /pagani|ferrari|bugatti|porsche|mclaren|lamborghini|\bcar\b|vehicle/i.test(input.assetName) ? 'automotive' : 'unclassified'
   const { data: globalAsset, error: globalAssetError } = await db
