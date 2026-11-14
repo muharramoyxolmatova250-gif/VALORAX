@@ -442,6 +442,7 @@ export default async (request: Request) => {
         model,
         tools: [{ type: 'web_search', search_context_size: 'medium' }],
         tool_choice: 'required',
+        max_output_tokens: 8000,
         input: prompt,
         text: {
           format: {
