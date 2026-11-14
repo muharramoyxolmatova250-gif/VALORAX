@@ -18,7 +18,7 @@
 10. The verdict gate can downgrade GOOD or BAD to UNCERTAIN. It never upgrades a verdict; it requires at least two publisher domains remaining as corroboration candidates after dependency screening.
 11. The server persists the asset, evidence, report, citation sources, typed identifier entities and candidate graph relationships in Supabase using a server-only service-role key. Explicitly labelled previous-owner/owner, auction, event and document references plus allow-listed organizations are extracted into evidence-linked graph nodes; every discovered relationship remains `candidate` with zero confidence until human review.
 12. A deterministic negative-space audit reports submitted-ledger gaps, impact and next evidence steps. It lists citation domains returned by web search, while explicitly stating that the API does not expose a complete query/page audit trail.
-13. The browser renders source citations, source-lineage warnings, negative-space gaps, expected evidence, submitted-ledger coverage, module findings, exact identifiers, usage quota and verdict-gate reasoning.
+13. The browser renders source citations, source-lineage warnings, negative-space gaps and the Responses API search trace (queries, sources, opened pages, find-in-page patterns), expected evidence, submitted-ledger coverage, module findings, exact identifiers, monthly quota, provider token usage, web-search call count and verdict-gate reasoning.
 
 ## Status semantics
 
