@@ -24,6 +24,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Test OMNISIGHT evidence guard
+        run: npm run test:omnisight
       - name: Type-check application
         run: npx tsc --noEmit
       - name: Type-check Netlify functions
