@@ -123,6 +123,7 @@ create table if not exists public.omnisight_market_sales (
   source_url text not null unique,
   source_title text not null,
   verification_status text not null default 'candidate' check (verification_status in ('candidate','verified','rejected')),
+  data_use_status text not null default 'review_required' check (data_use_status in ('review_required','licensed','public_domain','permission_granted','restricted')),
   verification_basis text,
   verified_at timestamptz,
   created_at timestamptz not null default now(),
@@ -215,21 +216,30 @@ create policy "owner reads own omnisight entities" on public.omnisight_entities 
 drop policy if exists "owner reads own omnisight relationships" on public.omnisight_relationships;
 create policy "owner reads own omnisight relationships" on public.omnisight_relationships for select to authenticated using (owner_id = auth.uid());
 drop policy if exists "signed-in users read verified market sales" on public.omnisight_market_sales;
-create policy "signed-in users read verified market sales" on public.omnisight_market_sales for select to authenticated using (verification_status = 'verified');
+create policy "signed-in users read cleared market sales" on public.omnisight_market_sales for select to authenticated using (verification_status = 'verified' and data_use_status in ('licensed','public_domain','permission_granted'));
 drop policy if exists "owner reads own monthly usage" on public.omnisight_usage_monthly;
 create policy "owner reads own monthly usage" on public.omnisight_usage_monthly for select to authenticated using (user_id = auth.uid());
+
+-- Curated public identity records. These rows are public-source catalogue references;
+-- user-submitted private asset names are never auto-published into this shared index.
+insert into public.omnisight_global_assets (display_name, canonical_key, asset_class)
+values
+('2022 Pagani Huayra R — chassis ZA9H11WTYYSF76003','identifier-za9h11wtyysf76003','automotive'),
+('2022 Pagani Huayra R — chassis ZA9H11WTYYSF76005','identifier-za9h11wtyysf76005','automotive')
+on conflict (canonical_key) do update set display_name = excluded.display_name, asset_class = excluded.asset_class;
 
 -- Seed only auction-house-published sold results. These are catalogue results, not
 -- independent confirmation of settlement, vehicle authenticity or legal ownership.
 insert into public.omnisight_market_sales
-(make, model, model_year, chassis_identifier, production_serial, auction_house, auction_name, lot_number, sale_date, event_start, event_end, location, sale_amount, currency, result_status, source_url, source_title, verification_status, verification_basis, verified_at)
+(make, model, model_year, chassis_identifier, production_serial, auction_house, auction_name, lot_number, sale_date, event_start, event_end, location, sale_amount, currency, result_status, source_url, source_title, verification_status, data_use_status, verification_basis, verified_at)
 values
-('Pagani','Huayra R',2022,'ZA9H11WTYYSF76003','11/30','RM Sotheby''s','The Tailored for Speed Collection','132','2025-10-11','2025-10-11','2025-10-11','Zurich, Switzerland',2367500,'CHF','sold','https://rmsothebys.com/auctions/id25/lots/r0042-2022-pagani-huayra-r/','2022 Pagani Huayra R | The Tailored for Speed Collection | RM Sotheby''s','verified','Primary auction-house lot page explicitly lists chassis ZA9H11WTYYSF76003, serial 11/30 and CHF 2,367,500 Sold; auction event page dates the sale 11 October 2025. This verifies the published auction result only.',now()),
-('Pagani','Huayra R',2022,'ZA9H11WTYYSF76005','5/30','RM Sotheby''s','Paris 2025','254',null,'2025-02-04','2025-02-05','Paris, France',3042500,'EUR','sold','https://backoffice.rmsothebys.com/auctions/pa25/lots/r0020-2022-pagani-huayra-r/','2022 Pagani Huayra R | Paris 2025 | RM Sotheby''s','verified','Primary auction-house lot page explicitly lists chassis ZA9H11WTYYSF76005, serial 5/30 and EUR 3,042,500 Sold; Paris auction event ran 4–5 February 2025, but this row does not assert the exact lot sale day.',now())
+('Pagani','Huayra R',2022,'ZA9H11WTYYSF76003','11/30','RM Sotheby''s','The Tailored for Speed Collection','132','2025-10-11','2025-10-11','2025-10-11','Zurich, Switzerland',2367500,'CHF','sold','https://rmsothebys.com/auctions/id25/lots/r0042-2022-pagani-huayra-r/','2022 Pagani Huayra R | The Tailored for Speed Collection | RM Sotheby''s','verified','review_required','Primary auction-house lot page explicitly lists chassis ZA9H11WTYYSF76003, serial 11/30 and CHF 2,367,500 Sold; auction event page dates the sale 11 October 2025. This verifies the published auction result only.',now()),
+('Pagani','Huayra R',2022,'ZA9H11WTYYSF76005','5/30','RM Sotheby''s','Paris 2025','254',null,'2025-02-04','2025-02-05','Paris, France',3042500,'EUR','sold','https://backoffice.rmsothebys.com/auctions/pa25/lots/r0020-2022-pagani-huayra-r/','2022 Pagani Huayra R | Paris 2025 | RM Sotheby''s','verified','review_required','Primary auction-house lot page explicitly lists chassis ZA9H11WTYYSF76005, serial 5/30 and EUR 3,042,500 Sold; Paris auction event ran 4–5 February 2025, but this row does not assert the exact lot sale day.',now())
 on conflict (source_url) do update set
   sale_amount = excluded.sale_amount,
   currency = excluded.currency,
   result_status = excluded.result_status,
   verification_status = excluded.verification_status,
+  data_use_status = excluded.data_use_status,
   verification_basis = excluded.verification_basis,
   verified_at = excluded.verified_at;
