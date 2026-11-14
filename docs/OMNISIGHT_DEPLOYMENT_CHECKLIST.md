@@ -20,6 +20,8 @@ In the correct Supabase project:
    - `omnisight_market_sales`
    - `omnisight_usage_monthly`
 5. Confirm the migration created the monthly quota RPC `omnisight_consume_monthly_credit`.
+6. Run the second migration `supabase/migrations/202611140002_omnisight_persistent_rate_limit.sql`.
+7. Confirm the persistent per-user rate-limit RPC `omnisight_consume_rate_limit` exists and is executable by `service_role` only.
 
 The two seeded Huayra R sale facts are marked `data_use_status='review_required'`. They are not exposed as cleared comparables until licensing/permission review is documented.
 
@@ -67,7 +69,8 @@ After setting or changing environment variables, trigger a new Netlify deploy so
 ## 6. Quotas and cost controls
 
 - Current hard monthly limit: 10 analysis attempts per authenticated user.
-- Server rate limiter: up to 3 requests per minute per Netlify function instance/IP.
+- Persistent database rate limiter: up to 3 requests per authenticated user per 60-second window across serverless instances.
+- Additional in-memory IP limiter: best-effort protection per function instance; it is not a global distributed limit.
 - Request body: maximum 40 KB and 12 evidence records.
 - Model output: maximum 8,000 tokens per request.
 - Failed AI calls consume an attempt; this prevents repeated free retries.
