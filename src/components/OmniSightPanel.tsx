@@ -37,6 +37,13 @@ type AnalysisResponse = {
     record_ids: string[]
     note: string
   }>
+  identity_identifiers: Array<{
+    identifier_type: 'vin_or_chassis' | 'production_serial'
+    value: string
+    normalized_value: string
+  }>
+  persistence: { assetId: string; analysisId: string; evidenceCount: number; graphEntityCount: number; graphRelationshipCount: number }
+  usage: { used: number; limit: number; resets_at: string }
   citations: Array<{ title: string; url: string }>
   verdict_guard: {
     applied: boolean
@@ -329,6 +336,25 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
               )}
               {analysisResult.analysis.unknowns.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-amber-200">UNKNOWNS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.unknowns.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
               {analysisResult.analysis.next_checks.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">NEXT CHECKS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.next_checks.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+              <section className="rounded-lg border border-[#D4AF37]/15 bg-black/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">IDENTITY REGISTER · EXACT IDENTIFIERS</h3>
+                  <span className="text-[10px] text-white/35">Monthly analyses: {analysisResult.usage.used}/{analysisResult.usage.limit}</span>
+                </div>
+                {analysisResult.identity_identifiers.length === 0 ? (
+                  <p className="mt-2 text-xs text-amber-100/65">No explicitly labelled VIN/chassis or production serial was found in submitted evidence. Do not infer a serial from digits inside a VIN.</p>
+                ) : (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {analysisResult.identity_identifiers.map(item => (
+                      <div key={item.identifier_type + item.normalized_value} className="rounded border border-white/10 p-3">
+                        <span className="text-[9px] font-bold tracking-widest text-white/40">{item.identifier_type === 'vin_or_chassis' ? 'VIN / CHASSIS IDENTIFIER' : 'FACTORY PRODUCTION SERIAL'}</span>
+                        <p className="mt-1 break-all font-mono text-sm text-white">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-3 text-[10px] text-white/35">Saved evidence: {analysisResult.persistence.evidenceCount} · Graph entities: {analysisResult.persistence.graphEntityCount} · Candidate links: {analysisResult.persistence.graphRelationshipCount}</p>
+              </section>
               <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
                 <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replace(/_/g, ' ')}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-white/55">{analysisResult.expected_evidence_checklist.interpretation}</p>
