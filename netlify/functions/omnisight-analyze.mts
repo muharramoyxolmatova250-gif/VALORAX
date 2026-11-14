@@ -2,6 +2,7 @@ import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
+import { summarizeComparableSales } from './lib/market-intelligence.mjs'
 import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
@@ -559,6 +560,7 @@ export default async (request: Request) => {
 
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations)
+    const marketSummary = summarizeComparableSales(marketData.records)
 
     return json({
       analysis: guarded.analysis,
@@ -567,6 +569,7 @@ export default async (request: Request) => {
       negative_space_audit: negativeSpaceAudit,
       identity_identifiers: identityIdentifiers,
       curated_market_comparables: marketData,
+      market_summary: marketSummary,
       citations: extracted.citations,
       source_lineage: sourceLineage,
       verdict_guard: {
