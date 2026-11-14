@@ -60,7 +60,7 @@ export function buildNegativeSpaceAudit(
         const url = new URL(rawUrl)
         if (url.protocol === 'https:' || url.protocol === 'http:') {
           sourceUrls.add(url.href)
-          domains.add(url.hostname.toLowerCase().replace(/^www\\./, ''))
+          domains.add(url.hostname.toLowerCase().replace(/^www\./, ''))
         }
       } catch {
         // Ignore invalid trace URLs.
