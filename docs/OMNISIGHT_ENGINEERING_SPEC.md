@@ -60,11 +60,11 @@ These are currently structured analysis layers, not separate services, agents or
 
 Migration: `supabase/migrations/202611140001_omnisight_intelligence.sql`.
 
-- Shared `omnisight_global_assets` indexes public asset names, while owner-scoped `omnisight_assets`, submitted evidence and analysis reports remain private under row-level security.
+- Shared `omnisight_global_assets` contains only pre-curated public identities. User-entered asset names are never auto-published to this shared index; a private user asset links to a global record only when one exact curated identifier matches. Owner-scoped `omnisight_assets`, submitted evidence and analysis reports remain private under row-level security.
 - `omnisight_global_sources` and `omnisight_global_asset_sources` create a shared public asset-to-source graph from URLs returned by web search. The edge state is `search_returned`, not verified; citation presence does not prove claim support.
 - The private per-user entity graph stores assets, source domains and explicitly extracted identifiers. VIN/chassis and factory production serial are separate entity types; relationships are candidate links until human review.
 - Exact global asset keys use one unambiguous VIN when the submitted records agree on exactly one. If records contain zero or multiple distinct VINs, the system falls back to a model-level key and marks identity resolution as unresolved/ambiguous. This avoids merging two chassis merely because they share a model name.
-- Curated auction sales have explicit sold/unsold/withdrawn and candidate/verified/rejected states. Signed-in users can read verified rows; only the server service role should curate them.
+- Curated auction sales have explicit sold/unsold/withdrawn and candidate/verified/rejected states plus a separate data-use/licensing status. Signed-in users can read only fact-verified rows whose data-use status is licensed, public-domain or permission-granted. The seeded Pagani auction facts remain `review_required` and are not exposed as cleared market data until rights review.
 - Monthly quota is enforced atomically by a database function. Current limit: 10 analysis attempts per user per calendar month. Failed provider calls consume an attempt to avoid repeated unmetered retries.
 - Direct user writes are not granted by the migration; the server writes with the service role after authenticating the user's JWT.
 
