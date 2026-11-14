@@ -356,7 +356,7 @@ export default async (request: Request) => {
     'NEGOTIATION INTELLIGENCE: identify evidence-backed price discussion points, not fabricated leverage.',
     'COUNTERFACTUAL HISTORY: outline alternative scenarios with confidence and evidence needed.',
     'PRIVATE KNOWLEDGE DISCOVERY: connect scattered public records and clearly mark leads requiring human verification.',
-    'For every finding use status SUPPORTED, PARTIAL, NOT_FOUND, CONFLICT or NOT_APPLICABLE. NOT_FOUND means not located in this search, not that the record does not exist. evidence_refs must point to citation URLs returned by web search; use an empty array when no citation supports the finding.
+    'For every finding use status SUPPORTED, PARTIAL, NOT_FOUND, CONFLICT or NOT_APPLICABLE. NOT_FOUND means not located in this search, not that the record does not exist. evidence_refs must point to citation URLs returned by web search; use an empty array when no citation supports the finding.',
     'Return a concise analysis and list the most important next checks.',
     '',
     'ASSET:',
