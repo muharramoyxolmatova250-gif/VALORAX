@@ -53,6 +53,21 @@ type AnalysisResponse = {
     record_ids: string[]
     note: string
   }>
+  market_summary: {
+    total_records: number
+    sold_records: number
+    unsold_records: number
+    withdrawn_records: number
+    currency_groups: Array<{
+      currency: string
+      count: number
+      minimum: number
+      median: number
+      maximum: number
+      sale_dates: string[]
+    }>
+    limitations: string[]
+  }
   curated_market_comparables: {
     records: Array<{
       make: string
@@ -436,6 +451,23 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                     ))}
                   </div>
                 )}
+              </section>
+              <section className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <h3 className="text-[10px] font-bold tracking-[0.18em] text-[#D4AF37]">VALUATION INTELLIGENCE · VERIFIED SALES SUMMARY</h3>
+                <p className="mt-2 text-xs text-white/55">{analysisResult.market_summary.sold_records} sold · {analysisResult.market_summary.unsold_records} unsold · {analysisResult.market_summary.withdrawn_records} withdrawn records</p>
+                {analysisResult.market_summary.currency_groups.length === 0 ? (
+                  <p className="mt-2 text-xs text-white/45">No eligible rights-cleared sold comparables were returned. OMNISIGHT will not estimate a price from asking prices or uncleared records.</p>
+                ) : analysisResult.market_summary.currency_groups.map(group => (
+                  <div key={group.currency} className="mt-3 rounded border border-white/10 p-3">
+                    <p className="text-xs font-semibold text-white">{group.currency} · {group.count} verified sold comparables</p>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                      <div><span className="block text-white/35">Low</span><span className="text-white">{group.minimum.toLocaleString()}</span></div>
+                      <div><span className="block text-white/35">Median</span><span className="text-[#D4AF37]">{group.median.toLocaleString()}</span></div>
+                      <div><span className="block text-white/35">High</span><span className="text-white">{group.maximum.toLocaleString()}</span></div>
+                    </div>
+                  </div>
+                ))}
+                {analysisResult.market_summary.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
               </section>
               <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
                 <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replace(/_/g, ' ')}</h3>
