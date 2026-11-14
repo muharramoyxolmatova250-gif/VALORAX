@@ -10,6 +10,7 @@ export type NegativeSpaceAudit = {
   search_method: string
   search_scope: string[]
   searched_source_domains: string[]
+  search_queries: string[]
   expected_trace_count: number
   submitted_trace_count: number
   gaps: Array<{
@@ -36,6 +37,7 @@ const GAP_GUIDANCE: Record<string, { significance: NegativeSpaceAudit['gaps'][nu
 export function buildNegativeSpaceAudit(
   coverage: NegativeSpaceCoverage[],
   citations: Array<{ title: string; url: string }>,
+  searchQueries: string[] = [],
 ): NegativeSpaceAudit {
   const domains = new Set<string>()
   for (const citation of citations) {
@@ -67,17 +69,20 @@ export function buildNegativeSpaceAudit(
     search_method: 'OpenAI web-search research plus deterministic comparison against the submitted evidence ledger.',
     search_scope: [
       'The model was instructed to search public web sources for expected traces for the named asset and asset class.',
-      'The API response exposes citation annotations, not a complete auditable log of every query, page opened or inaccessible result.',
+      searchQueries.length > 0
+        ? 'The API exposed the listed web-search queries; it does not expose a complete log of every page opened, inaccessible result or the exact evidence each page supported.'
+        : 'The API response did not expose query strings for this run; citation annotations alone are not a complete search audit trail.',
       'Coverage status means present or absent in the user-submitted evidence ledger; it does not prove a record was or was not found on the entire web.',
     ],
     searched_source_domains: [...domains].sort(),
+    search_queries: [...new Set(searchQueries.map(query => query.trim()).filter(Boolean))],
     expected_trace_count: coverage.length,
     submitted_trace_count: coverage.filter(item => item.status === 'PRESENT_IN_SUBMITTED_RECORDS').length,
     gaps,
     limitations: [
       'A missing submitted record is a documentation gap, not evidence of fraud, tampering or non-existence.',
       'No result in web search does not prove that a record does not exist in private archives, paid databases, registries or offline files.',
-      'The current API does not retain a query-by-query search audit trail; source domains are only those returned as citations.',
+      'Search query strings are recorded only when the OpenAI response exposes them; this is not a full page-by-page browsing or inaccessible-result log.',
       'Resolve high-impact gaps with primary records and human review before changing any verdict.',
     ],
   }
