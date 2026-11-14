@@ -1,6 +1,6 @@
 import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
-import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, persistOmnisightResearch } from './lib/omnisight-db.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
   id: string
@@ -517,6 +517,10 @@ export default async (request: Request) => {
 
     normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
     const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations)
+    const identityIdentifiers = [...new Map(
+      records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
+        .map(item => [item.identifier_type + ':' + item.normalized_value, item])
+    ).values()]
     let persistence
     try {
       persistence = await persistOmnisightResearch(db, user.id, {
@@ -535,6 +539,7 @@ export default async (request: Request) => {
       analysis: guarded.analysis,
       expected_evidence_checklist: expectedChecklist,
       submitted_evidence_coverage: buildEvidenceCoverage(records, expectedChecklist.asset_class),
+      identity_identifiers: identityIdentifiers,
       citations: extracted.citations,
       verdict_guard: {
         applied: guarded.applied,
