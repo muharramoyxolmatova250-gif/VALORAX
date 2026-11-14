@@ -168,7 +168,7 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div>
             <strong className="block text-amber-200">Evidence workspace — prototype</strong>
-            Records are saved only in this browser. This version captures and classifies evidence; it does not crawl sources, verify documents, authenticate assets, or use an AI model.
+            Evidence records are saved in this browser. Server research is available only after the Netlify environment variables are configured. AI findings are research leads, not proof of authenticity, ownership or condition.
           </div>
         </div>
 
