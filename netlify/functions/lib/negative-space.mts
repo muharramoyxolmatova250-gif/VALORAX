@@ -70,7 +70,10 @@ export function buildNegativeSpaceAudit(
   for (const citation of citations) {
     try {
       const url = new URL(citation.url)
-      if (url.protocol === 'https:' || url.protocol === 'http:') domains.add(url.hostname.toLowerCase().replace(/^www\./, ''))
+      if (url.protocol === 'https:' || url.protocol === 'http:') {
+        domains.add(url.hostname.toLowerCase().replace(/^www\./, ''))
+        sourceUrls.add(url.href)
+      }
     } catch {
       // Invalid citations are excluded from the search trace.
     }
