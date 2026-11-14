@@ -143,6 +143,94 @@ function applyGoodVerdictGuard(
   }
 }
 
+function sanitizeFindingReferences(finding: IntelligenceFinding, allowedUrls: Set<string>): IntelligenceFinding {
+  const validRefs = finding.evidence_refs.filter(url => {
+    try { return allowedUrls.has(new URL(url).href) } catch { return false }
+  })
+  const invalidCount = finding.evidence_refs.length - validRefs.length
+  if (invalidCount === 0) return { ...finding, evidence_refs: validRefs }
+  return {
+    ...finding,
+    status: finding.status === 'NOT_APPLICABLE' ? 'NOT_APPLICABLE' : 'PARTIAL',
+    confidence: Math.min(finding.confidence, 0.49),
+    evidence_refs: validRefs,
+    limitations: [
+      ...finding.limitations,
+      'One or more claimed evidence references did not match URLs actually returned by web search and were removed.',
+    ],
+  }
+}
+
+function sanitizeIntelligenceReferences(analysis: AnalysisResult, citations: Array<{ title: string; url: string }>) {
+  const allowedUrls = new Set(citations.map(item => {
+    try { return new URL(item.url).href } catch { return '' }
+  }).filter(Boolean))
+  for (const finding of Object.values(analysis.intelligence)) {
+    Object.assign(finding, sanitizeFindingReferences(finding, allowedUrls))
+  }
+  for (const finding of Object.values(analysis.advanced_analysis)) {
+    Object.assign(finding, sanitizeFindingReferences(finding, allowedUrls))
+  }
+}
+
+function expectedEvidenceChecklist(assetName: string) {
+  const name = assetName.toLowerCase()
+  if (/ferrari|pagani|bugatti|porsche|mclaren|lamborghini|mercedes|aston martin|bentley|rolls.?royce|car|automobile|vehicle|hyperc(ar|ar)/.test(name)) {
+    return {
+      asset_class: 'automotive',
+      expected_traces: [
+        'Exact VIN/chassis and factory build identity',
+        'Manufacturer or marque build record / certificate where obtainable',
+        'Original delivery and ownership timeline',
+        'Auction catalogues and completed-sale records',
+        'Service, restoration and major-modification records',
+        'Title, registration, import/export and provenance documents where legally available',
+        'Competition, event or exhibition history when claimed',
+      ],
+      interpretation: 'This is a research checklist, not proof that every record must exist or be publicly accessible.',
+    }
+  }
+  if (/watch|rolex|patek|audemars|vacheron|cartier|omega/.test(name)) {
+    return {
+      asset_class: 'watch',
+      expected_traces: [
+        'Manufacturer reference and serial identity',
+        'Original production/configuration records where obtainable',
+        'Movement, case and dial consistency evidence',
+        'Service history and component replacement records',
+        'Original sale, ownership and auction records',
+      ],
+      interpretation: 'Serial-level records may be restricted; missing public records do not establish counterfeit status.',
+    }
+  }
+  if (/art|painting|sculpture|artist|canvas|work of art/.test(name)) {
+    return {
+      asset_class: 'art',
+      expected_traces: [
+        'Artist and work identification',
+        'Catalogue raisonné or recognised catalogue references where applicable',
+        'Exhibition and publication history',
+        'Ownership and sale provenance',
+        'Condition, conservation and restoration records',
+        'Expert opinions or scientific analysis where relevant',
+      ],
+      interpretation: 'The appropriate evidence depends on medium, period and artist; no single document authenticates every work.',
+    }
+  }
+  return {
+    asset_class: 'general_or_unclassified',
+    expected_traces: [
+      'Exact asset identifier and defining specifications',
+      'Primary maker, creator or registry records where applicable',
+      'Ownership and transfer history where relevant',
+      'Independent specialist records and completed transactions',
+      'Condition, repair, alteration or inspection records where relevant',
+      'Legal, title or export/import records where applicable',
+    ],
+    interpretation: 'Asset class was not confidently identified from the supplied name; checklist is deliberately generic.',
+  }
+}
+
 function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }> } {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
@@ -364,10 +452,12 @@ export default async (request: Request) => {
       return json({ error: 'AI returned an invalid verdict.' }, 502)
     }
 
+    sanitizeIntelligenceReferences(analysis, extracted.citations)
     const guarded = applyGoodVerdictGuard(analysis, extracted.citations)
 
     return json({
       analysis: guarded.analysis,
+      expected_evidence_checklist: expectedEvidenceChecklist(assetName),
       citations: extracted.citations,
       verdict_guard: {
         applied: guarded.applied,
