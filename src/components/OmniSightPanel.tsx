@@ -34,6 +34,7 @@ type AnalysisResponse = {
     search_method: string
     search_scope: string[]
     searched_source_domains: string[]
+    search_queries: string[]
     expected_trace_count: number
     submitted_trace_count: number
     gaps: Array<{
@@ -562,6 +563,12 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                   ))}
                 </div>
                 <p className="mt-3 text-[10px] text-white/45">Searched citation domains: {analysisResult.negative_space_audit.searched_source_domains.join(', ') || 'No citation domains returned'}</p>
+                <div className="mt-2">
+                  <p className="text-[10px] text-white/45">Web-search queries exposed by the API:</p>
+                  {analysisResult.negative_space_audit.search_queries.length ? analysisResult.negative_space_audit.search_queries.map((query, index) => (
+                    <p key={index} className="mt-1 text-[10px] text-white/65">• {query}</p>
+                  )) : <p className="mt-1 text-[10px] text-white/35">No query strings were exposed for this run.</p>}
+                </div>
                 {analysisResult.negative_space_audit.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
               </section>
               {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
