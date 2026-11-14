@@ -234,7 +234,7 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
               {analysisResult.analysis.unknowns.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-amber-200">UNKNOWNS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.unknowns.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
               {analysisResult.analysis.next_checks.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">NEXT CHECKS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.next_checks.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
               <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
-                <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replaceAll('_', ' ')}</h3>
+                <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replace(/_/g, ' ')}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-white/55">{analysisResult.expected_evidence_checklist.interpretation}</p>
                 <ul className="mt-3 grid gap-2 text-xs text-white/70 md:grid-cols-2">
                   {analysisResult.expected_evidence_checklist.expected_traces.map((item, index) => <li key={index} className="flex gap-2"><span className="text-amber-200">•</span>{item}</li>)}
@@ -255,7 +255,7 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                   <div className="grid gap-3 md:grid-cols-2">
                     {Object.entries(analysisResult.analysis.service_layers).map(([key, layer]) => (
                       <div key={key} className="rounded-lg border border-[#D4AF37]/15 bg-black/20 p-3">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-white">{key.replaceAll('_', ' ')}</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-white">{key.replace(/_/g, ' ')}</h4>
                         <p className="mt-2 text-xs leading-relaxed text-white/65">{layer.summary}</p>
                         <MiniList title="PRIORITIES" items={layer.priorities} />
                         <MiniList title="LIMITATIONS" items={layer.limitations} />
