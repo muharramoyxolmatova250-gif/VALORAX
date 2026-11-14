@@ -28,6 +28,13 @@ type AnalysisResponse = {
     expected_traces: string[]
     interpretation: string
   }
+  submitted_evidence_coverage: Array<{
+    key: string
+    label: string
+    status: 'PRESENT_IN_SUBMITTED_RECORDS' | 'NOT_PRESENT_IN_SUBMITTED_RECORDS'
+    record_ids: string[]
+    note: string
+  }>
   citations: Array<{ title: string; url: string }>
   checkedAt: string
   model: string
@@ -239,6 +246,21 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                 <ul className="mt-3 grid gap-2 text-xs text-white/70 md:grid-cols-2">
                   {analysisResult.expected_evidence_checklist.expected_traces.map((item, index) => <li key={index} className="flex gap-2"><span className="text-amber-200">•</span>{item}</li>)}
                 </ul>
+              </section>
+              <section className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <h3 className="text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">SUBMITTED EVIDENCE COVERAGE · DETERMINISTIC CHECK</h3>
+                <p className="mt-2 text-xs text-white/45">This checks only the records entered into this evidence workspace. It does not claim to measure every public record worldwide.</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {analysisResult.submitted_evidence_coverage.map(item => (
+                    <div key={item.key} className="rounded border border-white/10 bg-black/20 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white/80">{item.label}</span>
+                        <span className={`text-[9px] font-bold tracking-wider ${item.status === 'PRESENT_IN_SUBMITTED_RECORDS' ? 'text-emerald-300' : 'text-amber-200'}`}>{item.status === 'PRESENT_IN_SUBMITTED_RECORDS' ? 'RECORD MATCHED' : 'NO RECORD MATCH'}</span>
+                      </div>
+                      <p className="mt-2 text-[10px] leading-relaxed text-white/45">{item.note}</p>
+                    </div>
+                  ))}
+                </div>
               </section>
               <section className="space-y-4 border-t border-white/10 pt-4">
                 <div>
