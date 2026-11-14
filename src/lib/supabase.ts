@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL
+const configuredAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL yoki Anon Key topilmadi! .env.local faylini tekshiring.')
+export const supabaseConfigured = Boolean(configuredUrl && configuredAnonKey)
+
+if (!supabaseConfigured) {
+  console.warn('Supabase URL or anon key is missing. Authenticated features will remain unavailable until environment variables are configured.')
 }
 
-export const supabase = createClient(supabaseUrl  ||  '',    supabaseAnonKey  ||  '')
+// A valid inert placeholder prevents the whole application from crashing during local
+// UI development when Supabase is not configured. Requests will fail until real values exist.
+export const supabase = createClient(
+  configuredUrl || 'https://placeholder.supabase.co',
+  configuredAnonKey || 'placeholder-anon-key',
+)
