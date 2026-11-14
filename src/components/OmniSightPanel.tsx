@@ -9,7 +9,6 @@ const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
 
 type AnalysisResponse = {
   analysis: {
-  analysis: {
     verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
     confidence: number
     summary: string
