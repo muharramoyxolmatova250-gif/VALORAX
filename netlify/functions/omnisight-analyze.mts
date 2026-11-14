@@ -54,6 +54,59 @@ function rateLimited(ip: string) {
   return false
 }
 
+/**
+ * Conservative server-side gate for GOOD.
+ * Citation hosts and model-labelled reliability are signals, not proof of independence.
+ * The gate only blocks weakly supported GOOD verdicts; it never upgrades a verdict.
+ */
+function registrableHost(rawUrl: string): string | null {
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '')
+    if (!hostname || !hostname.includes('.')) return null
+    const labels = hostname.split('.')
+    const multiPartSuffixes = new Set(['co.uk', 'org.uk', 'com.au', 'net.au', 'co.nz', 'com.br', 'co.jp'])
+    const lastTwo = labels.slice(-2).join('.')
+    return multiPartSuffixes.has(lastTwo) ? labels.slice(-3).join('.') : lastTwo
+  } catch {
+    return null
+  }
+}
+
+function applyGoodVerdictGuard(
+  analysis: AnalysisResult,
+  citations: Array<{ title: string; url: string }>
+): { analysis: AnalysisResult; applied: boolean; reasons: string[] } {
+  if (analysis.verdict !== 'GOOD') {
+    return { analysis, applied: false, reasons: [] }
+  }
+
+  const reasons: string[] = []
+  const distinctHosts = new Set(
+    citations.map(item => registrableHost(item.url)).filter((host): host is string => Boolean(host))
+  )
+  const strongSources = analysis.source_assessments.filter(item => item.reliability === 'strong')
+
+  if (distinctHosts.size < 2) reasons.push('Fewer than two distinct cited publisher domains.')
+  if (strongSources.length < 2) reasons.push('Fewer than two sources were assessed as strong.')
+  if (analysis.confidence < 0.8) reasons.push('Confidence is below the 0.80 GOOD threshold.')
+  if (analysis.conflicts.length > 0) reasons.push('Unresolved conflicts remain in the analysis.')
+  if (analysis.unknowns.length > 0) reasons.push('Material unknowns remain in the analysis.')
+
+  if (reasons.length === 0) {
+    return { analysis, applied: false, reasons: [] }
+  }
+
+  return {
+    analysis: {
+      ...analysis,
+      verdict: 'UNCERTAIN',
+      summary: `Server evidence gate changed GOOD to UNCERTAIN: ${reasons.join(' ')} Original assessment: ${analysis.summary}`,
+    },
+    applied: true,
+    reasons,
+  }
+}
+
 function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }> } {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
@@ -253,9 +306,16 @@ export default async (request: Request) => {
       return json({ error: 'AI returned an invalid verdict.' }, 502)
     }
 
+    const guarded = applyGoodVerdictGuard(analysis, extracted.citations)
+
     return json({
-      analysis,
+      analysis: guarded.analysis,
       citations: extracted.citations,
+      verdict_guard: {
+        applied: guarded.applied,
+        reasons: guarded.reasons,
+        policy: 'GOOD requires at least two distinct cited publisher domains, two strong source assessments, confidence >= 0.80, and no unresolved conflicts or unknowns. This is a conservative triage gate, not proof of source independence.',
+      },
       checkedAt: new Date().toISOString(),
       model,
       disclaimer: 'Research triage only. Not an authentication, title, condition or valuation certificate.',
