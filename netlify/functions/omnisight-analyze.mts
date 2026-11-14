@@ -493,7 +493,7 @@ export default async (request: Request) => {
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
-    let crossAssetDiscovery = {
+    let crossAssetDiscovery: Awaited<ReturnType<typeof findCrossAssetConnections>> = {
       state: 'NO_SIGNAL' as const,
       links: [] as Array<{ related_asset: string; related_asset_key: string; shared_entity: string; shared_entity_type: string; relationship_type: string; evidence_id: string | null; review_status: string }>,
       limitations: ['Saved graph discovery was not available for this run.'],
