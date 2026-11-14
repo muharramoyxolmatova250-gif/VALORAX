@@ -58,3 +58,23 @@ Migration: supabase/migrations/202611140003_omnisight_global_lot_discovery.sql.
 - Client reads are limited by RLS to rights-cleared records. Source registry and job queue are service-role only.
 
 **Implementation status:** this change adds the database foundation and engineering contract only. It does not start a crawler, populate 500,000 records, create a scheduler/worker, or grant permission to use any auction-house data. Those require the approved source list, operational worker, staging tests and documented data rights.
+
+
+## Current provider adapter: Old Cars Data
+
+The first adapter targets the documented `GET /auctions/live` endpoint:
+- It returns active listings only; it does not provide a general upcoming-auctions feed.
+- Documented sources currently cover a limited set of collector-car marketplaces and auction houses (live feed is beta).
+- `price_min=500000` filters current bid/listed price; the response example reports currency as USD.
+- Pagination supports `page` and `limit` up to 100. The worker stores a durable page cursor and imports one page per scheduled run.
+- The provider documents a 250-request/minute API limit. Starter accounts are limited to the latest 20 live listings; paid plans are required for full live inventory.
+- Commercial use of REST/MCP data is stated as included from the paid 1K plan. Confirm the current contract and intended image/data display rights before enabling the source.
+- The provider documents live end timestamps as ISO 8601 when present; records without an end timestamp are kept only while recently refreshed and explicitly marked active.
+
+Official API references:
+- https://oldcarsdata.com/docs/auctions-live
+- https://oldcarsdata.com/docs
+
+The adapter is deliberately disabled until an operator enters a documented licence/permission in `omnisight_lot_sources`, marks the source approved and enabled, and configures `OCD_API_KEY` in Netlify. The worker refuses to contact the provider otherwise.
+
+**Coverage limit:** this adapter cannot promise 500,000 simultaneously active lots. Old Cars Data's live endpoint covers a finite set of supported sources; its 400,000+ advertised figure refers to completed historical sales, which are not eligible for VALORAX's active catalogue. Additional licensed providers and asset classes are required to approach the long-term 500,000-record target while keeping ended lots out of the customer-facing live catalogue.
