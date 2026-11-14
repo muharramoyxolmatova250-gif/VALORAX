@@ -26,6 +26,12 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
         bids: Number(lot.bids ?? 0),
         verified: Boolean(lot.verified),
         creator: lot.creator || 'External auction',
+        source: lot.source || 'External source',
+        sourceUrl: lot.sourceUrl || '',
+        status: lot.status === 'LIVE' || lot.status === 'UPCOMING' || lot.status === 'ENDED'
+          ? lot.status
+          : undefined,
+        currency: lot.currency || 'USD',
       }))
     } else {
       console.error('External auction API error:', response.status)
