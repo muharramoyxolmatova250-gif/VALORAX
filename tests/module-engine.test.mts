@@ -64,5 +64,5 @@ test('reports saved-graph cross-asset links as reviewable leads', () => {
   const module = report.modules.cross_asset_connections
   assert.equal(module.state, 'ACTIONABLE')
   assert.match(module.observations[0], /Ferrari F40/)
-  assert.match(module.limitations[0], /not proof/)
+  assert.match(module.limitations[1], /not proof/)
 })
