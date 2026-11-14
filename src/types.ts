@@ -65,6 +65,12 @@ export interface AuctionLot {
 
   // Concise source-linked factual summary
   summary?: string
+
+  aiStatus?: 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'stale' | 'not_started'
+
+  aiVerdict?: 'GOOD' | 'BAD' | 'UNCERTAIN' | null
+
+  aiSummary?: string
 }
 
 export interface BidEntry {
