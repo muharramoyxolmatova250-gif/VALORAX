@@ -87,6 +87,11 @@ test('Pagani real-source fixture keeps target chassis, production serial and com
   assert.match(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76005/)
   assert.doesNotMatch(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76003/)
   assert.ok(fixture.expected_invariants.some(item => item.includes('CHF 2,367,500')))
+  const disputed = fixture.evidence_records.find(record => record.status === 'disputed')
+  assert.ok(disputed)
+  assert.match(disputed.claim, /CHF 5,292,500/)
+  assert.match(disputed.claim, /does not clearly explain/)
+  assert.ok(fixture.expected_invariants.some(item => item.includes('Do not speculate that the price difference includes the simulator')))
 })
 
 test('resolves an asset to a VIN key only when exactly one distinct VIN is present', () => {
