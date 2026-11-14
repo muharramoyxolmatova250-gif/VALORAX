@@ -42,14 +42,15 @@ export function normalizeFinding(
   allowedUrls: Set<string>,
   key: string,
 ): IntelligenceFinding {
-  const refs = [...new Set(finding.evidence_refs.filter((value) => {
+  const validRefs = finding.evidence_refs.filter((value) => {
     try {
       return allowedUrls.has(new URL(value).href)
     } catch {
       return false
     }
-  }))]
-  const invalidRefs = finding.evidence_refs.length - refs.length
+  })
+  const refs = [...new Set(validRefs)]
+  const invalidRefs = finding.evidence_refs.length - validRefs.length
   const result: IntelligenceFinding = {
     ...finding,
     evidence_refs: refs,
