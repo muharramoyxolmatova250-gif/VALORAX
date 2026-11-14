@@ -19,7 +19,7 @@ test('returns all eight deterministic module checks without inventing evidence',
   assert.equal(report.modules.negative_space.state, 'ACTIONABLE')
   assert.equal(report.modules.evidence_conflict_engine.state, 'ACTIONABLE')
   assert.match(report.modules.valuation_intelligence.observations[0], /1 rights-cleared sold record/)
-  assert.match(report.modules.cross_asset_connections.limitations[0], /No connection is inferred/)
+  assert.match(report.modules.cross_asset_connections.limitations[0], /Only this user's saved OMNISIGHT graph/)
   assert.ok(report.modules.unknown_asset_hypotheses.limitations.length > 0)
 })
 
