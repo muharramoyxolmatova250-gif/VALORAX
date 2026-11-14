@@ -23,6 +23,15 @@
       "sourceUrl": "https://www.pagani.com/huayra-r/",
       "status": "source_observed",
       "createdAt": "2026-11-14T00:00:00.000Z"
+    },
+    {
+      "id": "secondary-media-centre-price-discrepancy",
+      "assetName": "2022 Pagani Huayra R",
+      "claim": "A secondary media-centre image record for RM Sotheby's Zurich Tailored for Speed Collection lot 132 displays 'Sold CHF 5,292,500'. This differs from the RM Sotheby's primary lot page result CHF 2,367,500. The media-centre record does not clearly explain whether the number represents the vehicle alone, a package, or an error. Treat as an unresolved price-scope discrepancy, not as the vehicle's confirmed sale price.",
+      "sourceName": "Barchetta MediaCenter — RM Sotheby's Zurich, lot 132 image record",
+      "sourceUrl": "https://barchetta.mediacenter.plus/?i=6312200",
+      "status": "disputed",
+      "createdAt": "2026-11-14T00:00:00.000Z"
     }
   ],
   "comparison_only": [
@@ -38,6 +47,8 @@
     "The RM Sotheby's lot 132 published result is CHF 2,367,500, not the higher simulator-inclusive media-centre number.",
     "The official Pagani source confirms model specifications and production limit, not this exact chassis.",
     "The Paris 2025 chassis 005 / serial 5/30 sale is a separate comparable, not target-asset provenance.",
-    "The final verdict must not authenticate the physical car or legal title. A cautious UNCERTAIN result is acceptable if evidence scope is insufficient."
+    "The final verdict must not authenticate the physical car or legal title. A cautious UNCERTAIN result is acceptable if evidence scope is insufficient.",
+    "Surface the secondary media-centre CHF 5,292,500 figure as a conflicting, lower-context source; do not silently replace the RM Sotheby's primary lot-page result CHF 2,367,500.",
+    "Do not speculate that the price difference includes the simulator; the source record does not establish the price scope."
   ]
 }
