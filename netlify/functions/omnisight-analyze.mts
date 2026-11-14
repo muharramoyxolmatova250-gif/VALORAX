@@ -182,7 +182,7 @@ function expectedEvidenceChecklist(assetName: string) {
       interpretation: 'Serial-level records may be restricted; missing public records do not establish counterfeit status.',
     }
   }
-  if (/\\bart\\b|painting|sculpture|artist|canvas|work of art/.test(name)) {
+  if (/\bart\b|painting|sculpture|artist|canvas|work of art/.test(name)) {
     return {
       asset_class: 'art',
       expected_traces: [
