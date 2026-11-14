@@ -6,17 +6,19 @@ test('reports absent submitted evidence as a gap, not as proof a record does not
   const audit = buildNegativeSpaceAudit([
     { key: 'identity', label: 'Exact identity', status: 'NOT_PRESENT_IN_SUBMITTED_RECORDS', record_ids: [], note: '' },
     { key: 'transactions', label: 'Completed sales', status: 'PRESENT_IN_SUBMITTED_RECORDS', record_ids: ['r1'], note: '' },
-  ], [{ title: 'Auction catalogue', url: 'https://www.example-auction.com/lot/1' }])
+  ], [{ title: 'Auction catalogue', url: 'https://www.example-auction.com/lot/1' }], ['Pagani Huayra R chassis history', 'Pagani Huayra R chassis history'])
   assert.equal(audit.gaps.length, 1)
   assert.equal(audit.gaps[0].significance, 'IDENTITY_CRITICAL')
   assert.ok(audit.searched_source_domains.includes('example-auction.com'))
   assert.match(audit.limitations[0], /not evidence of fraud/)
   assert.match(audit.search_scope[2], /does not prove/)
+  assert.deepEqual(audit.search_queries, ['Pagani Huayra R chassis history', 'Pagani Huayra R chassis history'])
 })
 
 test('does not invent searched domains when there are no citation annotations', () => {
   const audit = buildNegativeSpaceAudit([], [])
   assert.deepEqual(audit.searched_source_domains, [])
+  assert.deepEqual(audit.search_queries, [])
   assert.equal(audit.expected_trace_count, 0)
   assert.match(audit.limitations[2], /does not retain a query-by-query/)
 })
