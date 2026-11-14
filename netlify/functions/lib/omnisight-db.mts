@@ -89,13 +89,26 @@ export async function persistOmnisightResearch(
   const assetKey = canonicalKey(input.assetName)
   if (!assetKey) throw new Error('OMNISIGHT_ASSET_KEY_EMPTY')
 
+  const assetClass = /pagani|ferrari|bugatti|porsche|mclaren|lamborghini|\bcar\b|vehicle/i.test(input.assetName) ? 'automotive' : 'unclassified'
+  const { data: globalAsset, error: globalAssetError } = await db
+    .from('omnisight_global_assets')
+    .upsert({
+      display_name: input.assetName,
+      canonical_key: assetKey,
+      asset_class: assetClass,
+    }, { onConflict: 'canonical_key' })
+    .select('id')
+    .single()
+  if (globalAssetError || !globalAsset) throw new Error('OMNISIGHT_GLOBAL_ASSET_PERSIST_FAILED')
+
   const { data: asset, error: assetError } = await db
     .from('omnisight_assets')
     .upsert({
       owner_id: userId,
+      global_asset_id: globalAsset.id,
       display_name: input.assetName,
       canonical_key: assetKey,
-      asset_class: /pagani|ferrari|bugatti|porsche|mclaren|lamborghini|\bcar\b|vehicle/i.test(input.assetName) ? 'automotive' : 'unclassified',
+      asset_class: assetClass,
     }, { onConflict: 'owner_id,canonical_key' })
     .select('id')
     .single()
@@ -131,6 +144,45 @@ export async function persistOmnisightResearch(
     .select('id')
     .single()
   if (analysisError || !savedAnalysis) throw new Error('OMNISIGHT_ANALYSIS_PERSIST_FAILED')
+
+  // Only URLs returned as web-search citations enter the shared public source index.
+  // This records discovery, not factual verification or claim support.
+  const citationDomains = [...new Set(input.citations.map(item => safeHost(item.url)).filter(Boolean))]
+  let globalSourceCount = 0
+  if (input.citations.length > 0) {
+    const sourceRows = citationDomains.map(domain => ({
+      domain,
+      display_name: domain,
+    }))
+    const { data: globalSources, error: globalSourceError } = await db
+      .from('omnisight_global_sources')
+      .upsert(sourceRows, { onConflict: 'domain' })
+      .select('id,domain')
+    if (globalSourceError || !globalSources) throw new Error('OMNISIGHT_GLOBAL_SOURCE_PERSIST_FAILED')
+
+    const sourceIds = new Map(globalSources.map(source => [source.domain, source.id]))
+    const globalLinks = input.citations.flatMap(citation => {
+      const domain = safeHost(citation.url)
+      const sourceId = sourceIds.get(domain)
+      if (!sourceId) return []
+      return [{
+        global_asset_id: globalAsset.id,
+        global_source_id: sourceId,
+        source_url: citation.url,
+        source_title: citation.title,
+        source_kind: 'web_search_citation',
+        evidence_state: 'search_returned',
+        last_seen_at: new Date().toISOString(),
+      }]
+    })
+    if (globalLinks.length) {
+      const { error: linkError } = await db
+        .from('omnisight_global_asset_sources')
+        .upsert(globalLinks, { onConflict: 'global_asset_id,source_url' })
+      if (linkError) throw new Error('OMNISIGHT_GLOBAL_SOURCE_LINK_PERSIST_FAILED')
+      globalSourceCount = globalLinks.length
+    }
+  }
 
   const entities = new Map<string, { entity_type: string; canonical_key: string; label: string; attributes: Record<string, unknown> }>()
   entities.set('asset:' + assetKey, {
@@ -226,7 +278,7 @@ export async function persistOmnisightResearch(
     if (relationError) throw new Error('OMNISIGHT_GRAPH_RELATION_PERSIST_FAILED')
   }
 
-  return { assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length }
+  return { globalAssetId: globalAsset.id, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
 }
 
 function assetIdsafe(entityIds: Map<string, string>, assetKey: string) {
