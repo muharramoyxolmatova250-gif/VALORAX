@@ -70,7 +70,14 @@ function cleanText(value: string, max: number) {
 
 function rateLimited(ip: string) {
   const now = Date.now()
-  const recent = (requests.get(ip) ?? []).filter(time => now - time < WINDOW_MS)
+  // Bound the per-instance map so arbitrary client IPs cannot grow it indefinitely.
+  for (const [key, timestamps] of requests) {
+    const active = timestamps.filter(time => now - time < WINDOW_MS)
+    if (active.length) requests.set(key, active)
+    else requests.delete(key)
+  }
+  if (!requests.has(ip) && requests.size >= 2_000) return true
+  const recent = requests.get(ip) ?? []
   if (recent.length >= MAX_REQUESTS_PER_WINDOW) {
     requests.set(ip, recent)
     return true
@@ -239,7 +246,7 @@ export default async (request: Request) => {
 
   // Trust Netlify's platform-provided client IP only; do not trust caller-supplied X-Forwarded-For.
   const ip = request.headers.get('x-nf-client-connection-ip') || 'unknown'
-  if (rateLimited(ip)) {
+  if (ip !== 'unknown' && rateLimited(ip)) {
     return json({ error: 'Rate limit reached. Please wait one minute and try again.' }, 429)
   }
 
