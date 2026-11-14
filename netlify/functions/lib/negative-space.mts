@@ -6,11 +6,23 @@ export type NegativeSpaceCoverage = {
   note: string
 }
 
+export type NegativeSpaceTraceItem = {
+  action: 'search' | 'open_page' | 'find_in_page' | 'unknown'
+  queries: string[]
+  url: string | null
+  pattern: string | null
+  source_urls: string[]
+}
+
 export type NegativeSpaceAudit = {
   search_method: string
   search_scope: string[]
   searched_source_domains: string[]
+  searched_source_urls: string[]
   search_queries: string[]
+  search_trace: NegativeSpaceTraceItem[]
+  opened_page_urls: string[]
+  find_in_page_checks: Array<{ url: string | null; pattern: string }>
   expected_trace_count: number
   submitted_trace_count: number
   gaps: Array<{
@@ -38,8 +50,23 @@ export function buildNegativeSpaceAudit(
   coverage: NegativeSpaceCoverage[],
   citations: Array<{ title: string; url: string }>,
   searchQueries: string[] = [],
+  searchTrace: NegativeSpaceTraceItem[] = [],
 ): NegativeSpaceAudit {
   const domains = new Set<string>()
+  const sourceUrls = new Set<string>()
+  for (const trace of searchTrace) {
+    for (const rawUrl of [...trace.source_urls, ...(trace.url ? [trace.url] : [])]) {
+      try {
+        const url = new URL(rawUrl)
+        if (url.protocol === 'https:' || url.protocol === 'http:') {
+          sourceUrls.add(url.href)
+          domains.add(url.hostname.toLowerCase().replace(/^www\\./, ''))
+        }
+      } catch {
+        // Ignore invalid trace URLs.
+      }
+    }
+  }
   for (const citation of citations) {
     try {
       const url = new URL(citation.url)
@@ -75,14 +102,18 @@ export function buildNegativeSpaceAudit(
       'Coverage status means present or absent in the user-submitted evidence ledger; it does not prove a record was or was not found on the entire web.',
     ],
     searched_source_domains: [...domains].sort(),
+    searched_source_urls: [...sourceUrls].sort(),
     search_queries: [...new Set(searchQueries.map(query => query.trim()).filter(Boolean))],
+    search_trace: searchTrace,
+    opened_page_urls: [...new Set(searchTrace.filter(item => item.action === 'open_page' && item.url).map(item => item.url as string))],
+    find_in_page_checks: searchTrace.filter(item => item.action === 'find_in_page').map(item => ({ url: item.url, pattern: item.pattern || '' })),
     expected_trace_count: coverage.length,
     submitted_trace_count: coverage.filter(item => item.status === 'PRESENT_IN_SUBMITTED_RECORDS').length,
     gaps,
     limitations: [
       'A missing submitted record is a documentation gap, not evidence of fraud, tampering or non-existence.',
       'No result in web search does not prove that a record does not exist in private archives, paid databases, registries or offline files.',
-      'Search query strings are recorded only when the OpenAI response exposes them; this is not a full page-by-page browsing or inaccessible-result log.',
+      'Only web_search_call actions included in the API response are recorded. The trace may omit unexposed pages, inaccessible results, search-provider internals or sources not returned by the tool.',
       'Resolve high-impact gaps with primary records and human review before changing any verdict.',
     ],
   }
