@@ -146,7 +146,7 @@ function applyVerdictEvidenceGuard(
     analysis: {
       ...analysis,
       verdict: 'UNCERTAIN',
-      summary: `Server evidence gate changed GOOD to UNCERTAIN: ${reasons.join(' ')} Original assessment: ${analysis.summary}`,
+      summary: `Server evidence gate changed ${analysis.verdict} to UNCERTAIN: ${reasons.join(' ')} Original assessment: ${analysis.summary}`,
     },
     applied: true,
     reasons,
