@@ -63,7 +63,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       verified: false,
       creator: row.creator || '',
       currency: 'USD',
-      publishedValueUsd: Number(row.reserve ?? row.current_bid ?? 0),
+      publishedValueUsd: Math.max(Number(row.reserve ?? 0), Number(row.current_bid ?? 0)),
     }))
   } catch (error) {
     console.error('VALORAX own auction query failed:', error)
