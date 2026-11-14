@@ -1,5 +1,6 @@
 import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
   id: string
@@ -297,6 +298,17 @@ export default async (request: Request) => {
     return json({ error: 'OMNISIGHT server analysis is not enabled yet.' }, 503)
   }
 
+  let db
+  let user
+  try {
+    db = createOmnisightAdmin()
+    user = await authenticateOmnisightUser(db, request.headers.get('authorization'))
+  } catch (error) {
+    console.error('OMNISIGHT authentication setup failed:', error instanceof Error ? error.message : 'unknown')
+    return json({ error: 'Secure OMNISIGHT account service is not configured.' }, 503)
+  }
+  if (!user) return json({ error: 'Sign in with your VALORAX account to run private research.' }, 401)
+
   const apiKey = process.env.OPENAI_API_KEY
   const model = process.env.OMNISIGHT_MODEL
   if (!apiKey || !model) return json({ error: 'Server AI key or model is not configured.' }, 503)
@@ -345,6 +357,20 @@ export default async (request: Request) => {
     } catch {
       return json({ error: 'One or more evidence source URLs are invalid.' }, 400)
     }
+  }
+
+  let quota
+  try {
+    quota = await consumeOmnisightCredit(db, user.id)
+  } catch (error) {
+    console.error('OMNISIGHT quota check failed:', error instanceof Error ? error.message : 'unknown')
+    return json({ error: 'Could not verify your OMNISIGHT usage allowance.' }, 503)
+  }
+  if (!quota.allowed) {
+    return json({
+      error: 'Monthly OMNISIGHT research allowance reached.',
+      usage: { used: quota.used, limit: quota.monthly_limit, resets_at: quota.resets_at },
+    }, 429)
   }
 
   const expectedChecklist = expectedEvidenceChecklist(assetName)
@@ -491,6 +517,19 @@ export default async (request: Request) => {
 
     normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
     const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations)
+    let persistence
+    try {
+      persistence = await persistOmnisightResearch(db, user.id, {
+        assetName,
+        records,
+        analysis: guarded.analysis,
+        citations: extracted.citations,
+        model,
+      })
+    } catch (error) {
+      console.error('OMNISIGHT persistence failed:', error instanceof Error ? error.message : 'unknown')
+      return json({ error: 'Research completed but could not be safely saved. Please retry later.' }, 503)
+    }
 
     return json({
       analysis: guarded.analysis,
@@ -504,6 +543,8 @@ export default async (request: Request) => {
       },
       checkedAt: new Date().toISOString(),
       model,
+      persistence,
+      usage: { used: quota.used, limit: quota.monthly_limit, resets_at: quota.resets_at },
       disclaimer: 'Research triage only. Not an authentication, title, condition or valuation certificate.',
     })
   } catch (error) {
