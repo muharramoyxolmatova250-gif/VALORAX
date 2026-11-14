@@ -23,17 +23,16 @@ export function extractOpenAiResponse(payload: any): {
       const queries = Array.isArray(action.queries)
         ? action.queries.filter((query: unknown): query is string => typeof query === 'string' && Boolean(query.trim()))
         : typeof action.query === 'string' && action.query.trim() ? [action.query] : []
-      const sourceUrls = Array.isArray(action.sources)
-        ? action.sources.flatMap((source: any) => {
-            if (typeof source?.url !== 'string') return []
-            try {
-              const url = new URL(source.url)
-              return ['http:', 'https:'].includes(url.protocol) ? [url.href] : []
-            } catch {
-              return []
-            }
-          })
-        : []
+      const sourceList: any[] = Array.isArray(action.sources) ? action.sources : []
+      const sourceUrls: string[] = sourceList.flatMap((source: any): string[] => {
+        if (typeof source?.url !== 'string') return []
+        try {
+          const url = new URL(source.url)
+          return ['http:', 'https:'].includes(url.protocol) ? [url.href] : []
+        } catch {
+          return []
+        }
+      })
       let url: string | null = null
       if (typeof action.url === 'string') {
         try {
