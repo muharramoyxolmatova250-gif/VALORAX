@@ -67,6 +67,23 @@ type AnalysisResponse = {
   persistence: { globalAssetId: string | null; identityState: 'single_vin_candidate' | 'multiple_vin_candidates' | 'model_only'; assetId: string; analysisId: string; evidenceCount: number; graphEntityCount: number; graphRelationshipCount: number; globalSourceCount: number }
   usage: { used: number; limit: number; resets_at: string }
   citations: Array<{ title: string; url: string }>
+  source_lineage: {
+    records: Array<{
+      title: string
+      url: string
+      hostname: string
+      publisher_domain: string
+      normalized_url: string
+      title_fingerprint: string
+      publisher_type: 'publisher' | 'distribution_platform' | 'unknown'
+      independence_state: 'same_publisher' | 'potentially_dependent' | 'independence_unverified'
+      dependency_reasons: string[]
+    }>
+    distinct_publisher_domains: number
+    corroboration_candidate_domains: number
+    potentially_dependent_groups: number
+    limitations: string[]
+  }
   verdict_guard: {
     applied: boolean
     reasons: string[]
@@ -457,6 +474,26 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                     ))}
                   </div>
                 </div>
+              </section>
+              <section className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[10px] font-bold tracking-[0.18em] text-[#D4AF37]">SOURCE LINEAGE & INDEPENDENCE SCREEN</h3>
+                  <span className="text-[10px] text-white/40">{analysisResult.source_lineage.corroboration_candidate_domains} unverified candidate domains</span>
+                </div>
+                <p className="mt-2 text-xs text-white/55">{analysisResult.source_lineage.distinct_publisher_domains} publisher domains · {analysisResult.source_lineage.potentially_dependent_groups} possible dependency groups</p>
+                <div className="mt-3 space-y-2">
+                  {analysisResult.source_lineage.records.map((source, index) => (
+                    <div key={source.normalized_url || source.url} className="rounded border border-white/10 p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-white">{source.publisher_domain}</span>
+                        <span className={source.independence_state === 'potentially_dependent' ? 'text-[10px] text-amber-200' : 'text-[10px] text-white/40'}>{source.independence_state.replace(/_/g, ' ')}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-white/55">{source.title}</p>
+                      {source.dependency_reasons.map(reason => <p key={reason} className="mt-1 text-[10px] text-amber-100/60">{reason}</p>)}
+                    </div>
+                  ))}
+                </div>
+                {analysisResult.source_lineage.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
               </section>
               {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
               <p className="border-t border-white/10 pt-3 text-[10px] leading-relaxed text-white/30">{analysisResult.disclaimer}</p>
