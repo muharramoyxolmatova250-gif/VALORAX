@@ -34,6 +34,8 @@ export interface AuctionLot {
 
   image: string
 
+  imageSourceUrl?: string
+
   currentBid: number
 
   reserve: number
