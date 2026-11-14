@@ -11,6 +11,7 @@ import StakingModal from './components/StakingModal'
 import RegisterModal from './components/RegisterModal'
 import CreateAuctionModal from './components/CreateAuctionModal'
 import LiveTicker from './components/LiveTicker'
+import OmniSightPanel from './components/OmniSightPanel'
 
 import {
   GOLD,
@@ -34,6 +35,7 @@ export default function App() {
   const [stakingOpen, setStakingOpen] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [createAuctionOpen, setCreateAuctionOpen] = useState(false)
+  const [omniSightOpen, setOmniSightOpen] = useState(false)
 
   const [claimProfile, setClaimProfile] = useState<Profile | null>(null)
   const [activeLot, setActiveLot] = useState<AuctionLot | null>(null)
@@ -141,6 +143,20 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.24em] text-[#D4AF37]">VALORAX INTELLIGENCE</p>
+              <h2 className="mt-1 text-lg font-black tracking-widest text-white">OMNISIGHT</h2>
+              <p className="mt-1 text-xs text-white/45">Independent asset evidence workspace</p>
+            </div>
+            <button
+              onClick={() => setOmniSightOpen(true)}
+              className="rounded-md border border-[#D4AF37]/50 px-5 py-3 text-[10px] font-black tracking-[0.18em] text-[#D4AF37] transition hover:bg-[#D4AF37] hover:text-black"
+            >
+              OPEN OMNISIGHT
+            </button>
+          </section>
 
           {/* Auction Directory */}
           <motion.section
@@ -414,6 +430,8 @@ export default function App() {
 
         </div>
       </main>
+
+      <OmniSightPanel open={omniSightOpen} onClose={() => setOmniSightOpen(false)} />
 
       {/* Footer Ticker */}
       <LiveTicker />
