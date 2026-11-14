@@ -108,7 +108,8 @@ export default async (request: Request) => {
   }
 
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return json({ error: 'Server AI key is not configured.' }, 503)
+  const model = process.env.OMNISIGHT_MODEL
+  if (!apiKey || !model) return json({ error: 'Server AI key or model is not configured.' }, 503)
 
   let body: { assetName?: unknown; records?: unknown }
   try {
@@ -169,7 +170,7 @@ export default async (request: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OMNISIGHT_MODEL || 'gpt-6-astra',
+        model,
         tools: [{ type: 'web_search', search_context_size: 'medium' }],
         tool_choice: 'required',
         input: prompt,
@@ -246,7 +247,7 @@ export default async (request: Request) => {
       analysis,
       citations: extracted.citations,
       checkedAt: new Date().toISOString(),
-      model: process.env.OMNISIGHT_MODEL || 'gpt-6-astra',
+      model,
       disclaimer: 'Research triage only. Not an authentication, title, condition or valuation certificate.',
     })
   } catch (error) {
