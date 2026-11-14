@@ -31,19 +31,19 @@ begin
     raise exception 'invalid_rate_limit_parameters';
   end if;
 
-  insert into public.omnisight_rate_limits(user_id, window_started_at, request_count, updated_at)
+  insert into public.omnisight_rate_limits as current_limit(user_id, window_started_at, request_count, updated_at)
   values (p_user_id, v_now, 1, v_now)
   on conflict (user_id) do update
   set
     window_started_at = case
-      when public.omnisight_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= v_now
+      when current_limit.window_started_at + make_interval(secs => p_window_seconds) <= v_now
         then v_now
       else public.omnisight_rate_limits.window_started_at
     end,
     request_count = case
       when public.omnisight_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= v_now
         then 1
-      else public.omnisight_rate_limits.request_count + 1
+      else current_limit.request_count + 1
     end,
     updated_at = v_now
   returning public.omnisight_rate_limits.window_started_at, public.omnisight_rate_limits.request_count
