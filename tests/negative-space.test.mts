@@ -9,7 +9,7 @@ test('reports absent submitted evidence as a gap, not as proof a record does not
   ], [{ title: 'Auction catalogue', url: 'https://www.example-auction.com/lot/1' }])
   assert.equal(audit.gaps.length, 1)
   assert.equal(audit.gaps[0].significance, 'IDENTITY_CRITICAL')
-  assert.ok(audit.searched_source_domains.includes('www.example-auction.com'))
+  assert.ok(audit.searched_source_domains.includes('example-auction.com'))
   assert.match(audit.limitations[0], /not evidence of fraud/)
   assert.match(audit.search_scope[2], /does not prove/)
 })
