@@ -528,7 +528,6 @@ export default async (request: Request) => {
         assetName,
         records,
         analysis: analysisWithUsage,
-      deterministic_modules: deterministicModules,
         citations: extracted.citations,
         model,
       })
@@ -544,6 +543,7 @@ export default async (request: Request) => {
 
     return json({
       analysis: analysisWithUsage,
+      deterministic_modules: deterministicModules,
       expected_evidence_checklist: expectedChecklist,
       submitted_evidence_coverage: submittedCoverage,
       negative_space_audit: negativeSpaceAudit,
