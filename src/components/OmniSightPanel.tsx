@@ -34,7 +34,17 @@ type AnalysisResponse = {
     search_method: string
     search_scope: string[]
     searched_source_domains: string[]
+    searched_source_urls: string[]
     search_queries: string[]
+    search_trace: Array<{
+      action: 'search' | 'open_page' | 'find_in_page' | 'unknown'
+      queries: string[]
+      url: string | null
+      pattern: string | null
+      source_urls: string[]
+    }>
+    opened_page_urls: string[]
+    find_in_page_checks: Array<{ url: string | null; pattern: string }>
     expected_trace_count: number
     submitted_trace_count: number
     gaps: Array<{
@@ -569,6 +579,18 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                     <p key={index} className="mt-1 text-[10px] text-white/65">• {query}</p>
                   )) : <p className="mt-1 text-[10px] text-white/35">No query strings were exposed for this run.</p>}
                 </div>
+                <div className="mt-2">
+                  <p className="text-[10px] text-white/45">Pages opened by the research tool:</p>
+                  {analysisResult.negative_space_audit.opened_page_urls.length ? analysisResult.negative_space_audit.opened_page_urls.map(url => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer" className="mt-1 block break-all text-[10px] text-[#D4AF37] hover:underline">{url}</a>
+                  )) : <p className="mt-1 text-[10px] text-white/35">No open-page actions were exposed.</p>}
+                </div>
+                {analysisResult.negative_space_audit.find_in_page_checks.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[10px] text-white/45">In-page checks:</p>
+                    {analysisResult.negative_space_audit.find_in_page_checks.map((check, index) => <p key={index} className="mt-1 text-[10px] text-white/60">{check.pattern} · {check.url || 'URL not exposed'}</p>)}
+                  </div>
+                )}
                 {analysisResult.negative_space_audit.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
               </section>
               {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
