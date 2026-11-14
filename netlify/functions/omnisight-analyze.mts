@@ -109,11 +109,11 @@ function registrableHost(rawUrl: string): string | null {
   }
 }
 
-function applyGoodVerdictGuard(
+function applyVerdictEvidenceGuard(
   analysis: AnalysisResult,
   citations: Array<{ title: string; url: string }>
 ): { analysis: AnalysisResult; applied: boolean; reasons: string[] } {
-  if (analysis.verdict !== 'GOOD') {
+  if (analysis.verdict === 'UNCERTAIN') {
     return { analysis, applied: false, reasons: [] }
   }
 
@@ -123,11 +123,17 @@ function applyGoodVerdictGuard(
   )
   const strongSources = analysis.source_assessments.filter(item => item.reliability === 'strong')
 
-  if (distinctHosts.size < 2) reasons.push('Fewer than two distinct cited publisher domains.')
-  if (strongSources.length < 2) reasons.push('Fewer than two sources were assessed as strong.')
-  if (analysis.confidence < 0.8) reasons.push('Confidence is below the 0.80 GOOD threshold.')
-  if (analysis.conflicts.length > 0) reasons.push('Unresolved conflicts remain in the analysis.')
-  if (analysis.unknowns.length > 0) reasons.push('Material unknowns remain in the analysis.')
+  if (analysis.verdict === 'GOOD') {
+    if (distinctHosts.size < 2) reasons.push('Fewer than two distinct cited publisher domains.')
+    if (strongSources.length < 2) reasons.push('Fewer than two sources were assessed as strong.')
+    if (analysis.confidence < 0.8) reasons.push('Confidence is below the 0.80 GOOD threshold.')
+    if (analysis.conflicts.length > 0) reasons.push('Unresolved conflicts remain in the analysis.')
+    if (analysis.unknowns.length > 0) reasons.push('Material unknowns remain in the analysis.')
+  } else if (analysis.verdict === 'BAD') {
+    if (distinctHosts.size < 2) reasons.push('A BAD verdict requires at least two distinct cited publisher domains.')
+    if (strongSources.length < 1) reasons.push('A BAD verdict requires at least one source assessed as strong.')
+    if (analysis.conflicts.length === 0) reasons.push('No explicit evidence conflict was returned to substantiate the BAD verdict.')
+  }
 
   if (reasons.length === 0) {
     return { analysis, applied: false, reasons: [] }
@@ -483,7 +489,7 @@ export default async (request: Request) => {
     }
 
     normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
-    const guarded = applyGoodVerdictGuard(analysis, extracted.citations)
+    const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations)
 
     return json({
       analysis: guarded.analysis,
@@ -493,7 +499,7 @@ export default async (request: Request) => {
       verdict_guard: {
         applied: guarded.applied,
         reasons: guarded.reasons,
-        policy: 'GOOD requires at least two distinct cited publisher domains, two strong source assessments, confidence >= 0.80, and no unresolved conflicts or unknowns. This is a conservative triage gate, not proof of source independence.',
+        policy: 'GOOD requires at least two distinct cited publisher domains, two strong source assessments, confidence >= 0.80, and no unresolved conflicts or unknowns. BAD requires at least two distinct cited publisher domains, one strong source assessment, and an explicit conflict. Failing either gate downgrades to UNCERTAIN. These are conservative triage signals, not proof of source independence.',
       },
       checkedAt: new Date().toISOString(),
       model,
