@@ -71,8 +71,10 @@ function json(body: unknown, status = 200) {
 function isRecord(value: unknown): value is IncomingEvidence {
   if (!value || typeof value !== 'object') return false
   const item = value as Record<string, unknown>
-  return ['id', 'assetName', 'claim', 'sourceName', 'sourceUrl', 'status', 'createdAt']
-    .every(key => typeof item[key] === 'string')
+  const stringFields = ['id', 'assetName', 'claim', 'sourceName', 'sourceUrl', 'status', 'createdAt']
+  if (!stringFields.every(key => typeof item[key] === 'string')) return false
+  return ['seller_claim', 'source_observed', 'independently_corroborated', 'disputed', 'unknown']
+    .includes(item.status as string)
 }
 
 function cleanText(value: string, max: number) {
@@ -180,7 +182,7 @@ function expectedEvidenceChecklist(assetName: string) {
       interpretation: 'Serial-level records may be restricted; missing public records do not establish counterfeit status.',
     }
   }
-  if (/art|painting|sculpture|artist|canvas|work of art/.test(name)) {
+  if (/\\bart\\b|painting|sculpture|artist|canvas|work of art/.test(name)) {
     return {
       asset_class: 'art',
       expected_traces: [
@@ -285,9 +287,8 @@ export default async (request: Request) => {
   const declaredLength = Number(request.headers.get('content-length') || 0)
   if (declaredLength > 40_000) return json({ error: 'Request is too large.' }, 413)
 
-  const ip = request.headers.get('x-nf-client-connection-ip')
-    || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || 'unknown'
+  // Trust Netlify's platform-provided client IP only; do not trust caller-supplied X-Forwarded-For.
+  const ip = request.headers.get('x-nf-client-connection-ip') || 'unknown'
   if (rateLimited(ip)) {
     return json({ error: 'Rate limit reached. Please wait one minute and try again.' }, 429)
   }
