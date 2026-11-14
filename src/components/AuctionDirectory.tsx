@@ -348,6 +348,17 @@ function LotCard({
           </div>
 
           <div className="flex items-center gap-3">
+            {lot.imageSourceUrl && (
+              <a
+                href={lot.imageSourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                SOURCE IMAGE <ExternalLink size={9} />
+              </a>
+            )}
             {lot.sourceUrl && (
               <a
                 href={lot.sourceUrl}
