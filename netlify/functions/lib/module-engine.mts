@@ -113,7 +113,9 @@ export function buildDeterministicModuleReport(input: {
   const saleSummary = currencies.map(currency => {
     const rows = sold.filter(s => s.currency === currency)
     const amounts = rows.map(s => s.sale_amount).sort((a,b) => a-b)
-    return { currency, count: rows.length, min: amounts[0], max: amounts[amounts.length - 1] }
+    const middle = Math.floor(amounts.length / 2)
+    const median = amounts.length % 2 ? amounts[middle] : (amounts[middle - 1] + amounts[middle]) / 2
+    return { currency, count: rows.length, min: amounts[0], median, max: amounts[amounts.length - 1] }
   })
   return {
     generated_by: 'deterministic_rules_v1',
@@ -154,7 +156,7 @@ export function buildDeterministicModuleReport(input: {
         ['Check each candidate identifier against the manufacturer or registry.', 'Keep VIN/chassis, production sequence and auction lot numbers as separate identifier types.', 'Write each explanation as a hypothesis and state what would falsify it.'],
         records.filter(r => /\b(vin|chassis|serial|build number)\b/i.test(textOf(r))).map(r => r.id),
         ['Identifier-like text is not validated against an authoritative registry.', 'No identity hypothesis is promoted to fact.']),
-      acquisition_intelligence: make('Acquisition Intelligence', 'ACTIONABLE',
+      acquisition_intelligence: make('Acquisition Intelligence', [identityIds, factoryIds, provenanceIds, conditionIds, legalIds].filter(x => x.length).length >= 3 ? 'ACTIONABLE' : 'LIMITED',
         [`Buyer diligence coverage: ${[identityIds, factoryIds, provenanceIds, conditionIds, legalIds].filter(x => x.length).length}/5 key topic groups have at least one keyword-matched submitted record.`],
         ['Verify identity and seller authority before payment.', 'Obtain independent condition inspection and original supporting documents.', 'Check title, liens, export/import and transfer requirements with qualified professionals.', 'Use escrow and contractual protections reviewed by counsel.'],
         unique([...identityIds, ...factoryIds, ...provenanceIds, ...conditionIds, ...legalIds]),
@@ -165,7 +167,7 @@ export function buildDeterministicModuleReport(input: {
         ids(/only|limited|one of|production|units|made|built|numbered|edition/i),
         ['Text matching cannot validate a production count or surviving population.']),
       valuation_intelligence: make('Valuation Intelligence', sold.length ? 'ACTIONABLE' : 'LIMITED',
-        sold.length ? saleSummary.map(s => `${s.count} rights-cleared sold record(s) in ${s.currency}; observed range ${s.min}–${s.max}.`) : ['No eligible rights-cleared completed-sale records were supplied to this analysis.'],
+        sold.length ? saleSummary.map(s => `${s.count} rights-cleared sold record(s) in ${s.currency}; observed range ${s.min}–${s.max} (median ${s.median}).`) : ['No eligible rights-cleared completed-sale records were supplied to this analysis.'],
         ['Use completed sales, not asking prices, as transaction observations.', 'Compare exact model/version, specification, condition, provenance, date and sale terms.', 'Keep currencies separate unless a documented conversion method and date are supplied.'],
         [], ['The deterministic engine reports descriptive ranges only; it does not appraise or predict value.', 'An empty cleared dataset does not mean no sales exist elsewhere.'])
     }
