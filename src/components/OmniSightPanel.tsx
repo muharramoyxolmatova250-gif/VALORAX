@@ -42,7 +42,7 @@ type AnalysisResponse = {
     value: string
     normalized_value: string
   }>
-  persistence: { assetId: string; analysisId: string; evidenceCount: number; graphEntityCount: number; graphRelationshipCount: number }
+  persistence: { globalAssetId: string; identityState: 'single_vin_candidate' | 'multiple_vin_candidates' | 'model_only'; assetId: string; analysisId: string; evidenceCount: number; graphEntityCount: number; graphRelationshipCount: number; globalSourceCount: number }
   usage: { used: number; limit: number; resets_at: string }
   citations: Array<{ title: string; url: string }>
   verdict_guard: {
@@ -357,7 +357,7 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                     ))}
                   </div>
                 )}
-                <p className="mt-3 text-[10px] text-white/35">Saved evidence: {analysisResult.persistence.evidenceCount} · Graph entities: {analysisResult.persistence.graphEntityCount} · Candidate links: {analysisResult.persistence.graphRelationshipCount}</p>
+                <p className="mt-3 text-[10px] text-white/35">Identity key: {analysisResult.persistence.identityState.replace(/_/g, ' ')} · Saved evidence: {analysisResult.persistence.evidenceCount} · Private graph: {analysisResult.persistence.graphEntityCount} entities / {analysisResult.persistence.graphRelationshipCount} links · Global sources indexed: {analysisResult.persistence.globalSourceCount}</p>
               </section>
               <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
                 <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replace(/_/g, ' ')}</h3>
