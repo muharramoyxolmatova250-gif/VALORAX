@@ -209,26 +209,6 @@ export async function persistOmnisightResearch(
     entity_type: 'asset', canonical_key: assetKey, label: input.assetName, attributes: { asset_id: asset.id },
   })
 
-  const evidenceByClientId = new Map(evidence.map(row => [row.client_record_id, row.id]))
-  for (const record of input.records) {
-    const evidenceId = evidenceByClientId.get(record.id)
-    if (!evidenceId) continue
-    for (const identifier of extractAssetIdentifiers([record.claim, record.sourceName].join(' '))) {
-      const key = identifier.identifier_type + ':' + identifier.normalized_value
-      const identifierId = entityIds.get(key)
-      if (!identifierId) continue
-      relationships.push({
-        owner_id: userId,
-        from_entity_id: assetIdsafe(entityIds, assetKey),
-        to_entity_id: identifierId,
-        relationship_type: 'identifier_mentioned_in_submitted_record',
-        evidence_id: evidenceId,
-        analysis_id: savedAnalysis.id,
-        confidence: 0,
-        review_status: 'candidate',
-      })
-    }
-  }
   for (const record of evidence) {
     const host = safeHost(record.source_url || '')
     if (host) entities.set('source:' + host, {
@@ -263,6 +243,26 @@ export async function persistOmnisightResearch(
 
   const entityIds = new Map(savedEntities.map(entity => [entity.entity_type + ':' + entity.canonical_key, entity.id]))
   const relationships: Array<Record<string, unknown>> = []
+  const evidenceByClientId = new Map(evidence.map(row => [row.client_record_id, row.id]))
+  for (const record of input.records) {
+    const evidenceId = evidenceByClientId.get(record.id)
+    if (!evidenceId) continue
+    for (const identifier of extractAssetIdentifiers([record.claim, record.sourceName].join(' '))) {
+      const key = identifier.identifier_type + ':' + identifier.normalized_value
+      const identifierId = entityIds.get(key)
+      if (!identifierId) continue
+      relationships.push({
+        owner_id: userId,
+        from_entity_id: assetIdsafe(entityIds, assetKey),
+        to_entity_id: identifierId,
+        relationship_type: 'identifier_mentioned_in_submitted_record',
+        evidence_id: evidenceId,
+        analysis_id: savedAnalysis.id,
+        confidence: 0,
+        review_status: 'candidate',
+      })
+    }
+  }
   for (const record of evidence) {
     const host = safeHost(record.source_url || '')
     const sourceId = host ? entityIds.get('source:' + host) : undefined
