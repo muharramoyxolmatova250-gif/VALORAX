@@ -399,6 +399,97 @@ export async function persistOmnisightResearch(
   return { globalAssetId: globalAsset?.id ?? null, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, discoveredGraphCandidateCount: graphCandidates.length, globalSourceCount }
 }
 
+
+export async function findCrossAssetConnections(
+  db: OmnisightDb,
+  userId: string,
+  assetName: string,
+  records: Array<{ id: string; claim: string; sourceName: string; sourceUrl: string }>,
+) {
+  const identity = resolveAssetCanonicalKey(assetName, records.map(record => [record.claim, record.sourceName].join(' ')))
+  const { data: currentAssetNode, error: currentAssetError } = await db
+    .from('omnisight_entities')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('entity_type', 'asset')
+    .eq('canonical_key', identity.canonicalKey)
+    .maybeSingle()
+  if (currentAssetError) throw new Error('OMNISIGHT_CROSS_ASSET_CURRENT_NODE_FAILED')
+  if (!currentAssetNode) return { state: 'NO_SIGNAL' as const, links: [], limitations: ['Current asset has no persisted graph node yet.'] }
+
+  const candidates = records.flatMap(record => extractGraphCandidates(record))
+  const candidateKeys = [...new Set(candidates.map(item => item.entity_type + ':' + item.canonical_key))]
+  const identifierKeys = records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
+    .map(item => 'identifier:' + item.identifier_type + ':' + item.normalized_value)
+  const allKeys = [...new Set([...candidateKeys, ...identifierKeys])]
+  if (!allKeys.length) return { state: 'NO_SIGNAL' as const, links: [], limitations: ['No explicit shared entity or identifier candidates were extracted from submitted evidence.'] }
+
+  const { data: sharedNodes, error: sharedNodeError } = await db
+    .from('omnisight_entities')
+    .select('id,entity_type,canonical_key,label')
+    .eq('owner_id', userId)
+    .in('entity_type', ['person','organization','auction','document','event','identifier'])
+    .in('canonical_key', allKeys.map(key => key.slice(key.indexOf(':') + 1)))
+  if (sharedNodeError) throw new Error('OMNISIGHT_CROSS_ASSET_ENTITY_LOOKUP_FAILED')
+  if (!sharedNodes?.length) return { state: 'NO_SIGNAL' as const, links: [], limitations: ['No matching graph entities were found in this user\'s saved research.'] }
+
+  const { data: currentLinks, error: currentLinksError } = await db
+    .from('omnisight_relationships')
+    .select('to_entity_id')
+    .eq('owner_id', userId)
+    .eq('from_entity_id', currentAssetNode.id)
+    .in('review_status', ['candidate','verified'])
+  if (currentLinksError) throw new Error('OMNISIGHT_CROSS_ASSET_CURRENT_LINKS_FAILED')
+  const currentTargetIds = new Set((currentLinks ?? []).map(item => item.to_entity_id))
+  const sharedIds = sharedNodes.filter(node => currentTargetIds.has(node.id)).map(node => node.id)
+  if (!sharedIds.length) return { state: 'NO_SIGNAL' as const, links: [], limitations: ['No persisted shared entity links exist for the current asset.'] }
+
+  const { data: priorLinks, error: priorLinksError } = await db
+    .from('omnisight_relationships')
+    .select('from_entity_id,to_entity_id,relationship_type,evidence_id,review_status')
+    .eq('owner_id', userId)
+    .in('to_entity_id', sharedIds)
+    .neq('from_entity_id', currentAssetNode.id)
+    .in('review_status', ['candidate','verified'])
+    .limit(100)
+  if (priorLinksError) throw new Error('OMNISIGHT_CROSS_ASSET_RELATION_LOOKUP_FAILED')
+  if (!priorLinks?.length) return { state: 'NO_SIGNAL' as const, links: [], limitations: ['No prior asset in saved research shares these evidence-linked entities.'] }
+
+  const priorAssetIds = [...new Set(priorLinks.map(link => link.from_entity_id))]
+  const { data: priorAssets, error: priorAssetsError } = await db
+    .from('omnisight_entities')
+    .select('id,label,canonical_key')
+    .eq('owner_id', userId)
+    .eq('entity_type', 'asset')
+    .in('id', priorAssetIds)
+  if (priorAssetsError) throw new Error('OMNISIGHT_CROSS_ASSET_ASSET_LOOKUP_FAILED')
+  const assetsById = new Map((priorAssets ?? []).map(asset => [asset.id, asset]))
+  const nodesById = new Map(sharedNodes.map(node => [node.id, node]))
+  const links = priorLinks.flatMap(link => {
+    const asset = assetsById.get(link.from_entity_id)
+    const node = nodesById.get(link.to_entity_id)
+    if (!asset || !node) return []
+    return [{
+      related_asset: asset.label,
+      related_asset_key: asset.canonical_key,
+      shared_entity: node.label,
+      shared_entity_type: node.entity_type,
+      relationship_type: link.relationship_type,
+      evidence_id: link.evidence_id,
+      review_status: link.review_status,
+    }]
+  })
+  return {
+    state: links.length ? 'ACTIONABLE' as const : 'NO_SIGNAL' as const,
+    links,
+    limitations: [
+      'Connections are candidate leads from this user\'s saved graph, not proof of common ownership, authenticity or wrongdoing.',
+      'A shared marque, auction house or event can be incidental; a human must inspect the cited evidence and relationship context.',
+      'Only evidence previously saved in this user\'s OMNISIGHT workspace is searched; no global or private external database is queried.',
+    ],
+  }
+}
+
 function assetIdsafe(entityIds: Map<string, string>, assetKey: string) {
   const id = entityIds.get('asset:' + assetKey)
   if (!id) throw new Error('OMNISIGHT_ASSET_GRAPH_NODE_MISSING')
