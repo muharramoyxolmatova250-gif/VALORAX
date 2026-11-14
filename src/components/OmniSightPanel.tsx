@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseConfigured } from '../lib/supabase'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
 import type { AuctionLot } from '../types'
@@ -156,6 +156,10 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
   const sendMagicLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setAuthMessage('')
+    if (!supabaseConfigured) {
+      setAuthMessage('Supabase is not configured for this deployment yet.')
+      return
+    }
     setAuthLoading(true)
     try {
       const { error: authError } = await supabase.auth.signInWithOtp({
@@ -283,12 +287,12 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
             ) : (
               <form onSubmit={sendMagicLink} className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <input type="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="Your email address" className="min-w-0 rounded border border-white/15 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-64" />
-                <button type="submit" disabled={authLoading} className="rounded bg-[#D4AF37] px-4 py-2 text-[10px] font-black tracking-widest text-black disabled:opacity-50">{authLoading ? 'SENDING...' : 'SEND SECURE LINK'}</button>
+                <button type="submit" disabled={authLoading || !supabaseConfigured} className="rounded bg-[#D4AF37] px-4 py-2 text-[10px] font-black tracking-widest text-black disabled:opacity-50">{authLoading ? 'SENDING...' : 'SEND SECURE LINK'}</button>
               </form>
             )}
           </div>
           {authMessage && <p role="status" className="mt-3 text-xs text-amber-200/80">{authMessage}</p>}
-          {!session && <p className="mt-2 text-[10px] leading-relaxed text-white/35">A one-time sign-in link will be sent by Supabase Auth. Research is unavailable until the link is confirmed.</p>}
+          {!session && <p className="mt-2 text-[10px] leading-relaxed text-white/35">{supabaseConfigured ? 'A one-time sign-in link will be sent by Supabase Auth. Research is unavailable until the link is confirmed.' : 'Supabase URL and anon key must be configured before account sign-in is available.'}</p>}
         </section>
 
         <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
