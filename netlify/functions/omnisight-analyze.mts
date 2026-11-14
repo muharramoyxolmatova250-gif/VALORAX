@@ -512,6 +512,11 @@ export default async (request: Request) => {
     normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
     const sourceLineage = analyzeSourceLineage(extracted.citations)
     const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations, sourceLineage)
+    const analysisWithUsage = {
+      ...guarded.analysis,
+      provider_usage: extracted.providerUsage,
+      web_search_call_count: extracted.searchTrace.length,
+    }
     const identityIdentifiers = [...new Map(
       records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
         .map(item => [item.identifier_type + ':' + item.normalized_value, item])
@@ -533,11 +538,6 @@ export default async (request: Request) => {
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
-    const analysisWithUsage = {
-      ...guarded.analysis,
-      provider_usage: extracted.providerUsage,
-      web_search_call_count: extracted.searchTrace.length,
-    }
 
     return json({
       analysis: analysisWithUsage,
