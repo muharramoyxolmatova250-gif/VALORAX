@@ -29,6 +29,9 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       currency: lot.currency || 'USD',
       publishedValueUsd: Number(lot.publishedValueUsd ?? 0),
       summary: typeof lot.summary === 'string' ? lot.summary : '',
+      aiStatus: lot.aiStatus || 'not_started',
+      aiVerdict: lot.aiVerdict || null,
+      aiSummary: typeof lot.aiSummary === 'string' ? lot.aiSummary : '',
     }))
   } catch (error) {
     console.error('VALORAX premium catalogue API failed:', error)
