@@ -17,7 +17,7 @@ export default async () => {
     })
     const { data, error } = await db
       .from('omnisight_discovered_lots')
-      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,short_factual_summary,verification_status')
+      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status')
       .in('listing_status', ['active', 'upcoming'])
       .gte('published_value_usd', MIN_VALUE_USD)
       .order('auction_ends_at', { ascending: true })
@@ -34,7 +34,9 @@ export default async () => {
       const startAt = lot.auction_starts_at ? new Date(lot.auction_starts_at).getTime() : NaN
       const value = Number(lot.published_value_usd)
       const sourceUrl = typeof lot.canonical_url === 'string' ? lot.canonical_url : ''
-      const image = typeof lot.hero_image_url === 'string' ? lot.hero_image_url : ''
+      const imageRightsCleared = ['licensed', 'permission_granted'].includes(lot.image_usage_status)
+      const image = imageRightsCleared && typeof lot.hero_image_url === 'string' ? lot.hero_image_url : ''
+      const imageSourceUrl = Array.isArray(lot.image_urls) && typeof lot.image_urls[0] === 'string' ? lot.image_urls[0] : ''
       if (!Number.isFinite(value) || value < MIN_VALUE_USD || !Number.isFinite(endAt) || endAt <= now || !sourceUrl) return []
       const status = Number.isFinite(startAt) && startAt > now ? 'UPCOMING' : 'LIVE'
       const categoryMap: Record<string, string> = {
@@ -52,6 +54,7 @@ export default async () => {
         subtitle: [lot.model_year, lot.make, lot.model].filter(Boolean).join(' '),
         category: categoryMap[lot.asset_class] || 'Luxury',
         image,
+        imageSourceUrl,
         currentBid: value,
         reserve: value,
         escrow: 0,
