@@ -1,5 +1,6 @@
 import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
+import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
@@ -96,7 +97,7 @@ function rateLimited(ip: string) {
 
 /**
  * Conservative server-side gate for GOOD.
- * Citation hosts and model-labelled reliability are signals, not proof of independence.
+ * Source-lineage screening and model-labelled reliability are signals, not proof of independence.
  * The gate only blocks weakly supported GOOD verdicts; it never upgrades a verdict.
  */
 function registrableHost(rawUrl: string): string | null {
@@ -114,26 +115,24 @@ function registrableHost(rawUrl: string): string | null {
 
 function applyVerdictEvidenceGuard(
   analysis: AnalysisResult,
-  citations: Array<{ title: string; url: string }>
+  citations: Array<{ title: string; url: string }>,
+  lineage: ReturnType<typeof analyzeSourceLineage>
 ): { analysis: AnalysisResult; applied: boolean; reasons: string[] } {
   if (analysis.verdict === 'UNCERTAIN') {
     return { analysis, applied: false, reasons: [] }
   }
 
   const reasons: string[] = []
-  const distinctHosts = new Set(
-    citations.map(item => registrableHost(item.url)).filter((host): host is string => Boolean(host))
-  )
   const strongSources = analysis.source_assessments.filter(item => item.reliability === 'strong')
 
   if (analysis.verdict === 'GOOD') {
-    if (distinctHosts.size < 2) reasons.push('Fewer than two distinct cited publisher domains.')
+    if (lineage.corroboration_candidate_domains < 2) reasons.push('Fewer than two publisher domains remain as corroboration candidates after same-publisher and syndication screening.')
     if (strongSources.length < 2) reasons.push('Fewer than two sources were assessed as strong.')
     if (analysis.confidence < 0.8) reasons.push('Confidence is below the 0.80 GOOD threshold.')
     if (analysis.conflicts.length > 0) reasons.push('Unresolved conflicts remain in the analysis.')
     if (analysis.unknowns.length > 0) reasons.push('Material unknowns remain in the analysis.')
   } else if (analysis.verdict === 'BAD') {
-    if (distinctHosts.size < 2) reasons.push('A BAD verdict requires at least two distinct cited publisher domains.')
+    if (lineage.corroboration_candidate_domains < 2) reasons.push('A BAD verdict requires at least two publisher domains remaining after same-publisher and syndication screening.')
     if (strongSources.length < 1) reasons.push('A BAD verdict requires at least one source assessed as strong.')
     if (analysis.conflicts.length === 0) reasons.push('No explicit evidence conflict was returned to substantiate the BAD verdict.')
   }
@@ -404,7 +403,7 @@ export default async (request: Request) => {
     'ABSOLUTE EVIDENCE GATE: Even the most expensive or prestigious car must never receive a positive verdict without credible, traceable evidence supporting the specific claims being reviewed. High value does not lower the proof threshold; if evidence is missing or insufficient, return UNCERTAIN.',
     'Visual appearance, brand prestige, celebrity ownership claims and a high asking price are not proof of identity, authenticity, provenance, condition or value.',
     'For every material claim, identify what the source actually supports, the exact asset identity it refers to, the source date, and whether the source is primary, independent or seller-controlled.',
-    'Do not treat repeated copies of the same press release, catalogue text or seller statement as independent corroboration. Trace claims back to their original source where possible.',
+    'Do not treat repeated copies of the same press release, catalogue text or seller statement as independent corroboration. Trace claims back to their original source where possible. Identify publisher ownership, press-release distribution, syndication, shared wire copy and source dependencies. If dependency cannot be checked, say independence is unverified.',
     'Check identity carefully: distinguish model name, model year, chassis/VIN, factory build number, production sequence number and auction lot number. Similar digits or names do not prove they are the same vehicle.',
     'Separate observed facts, seller-reported claims, independent corroboration, inference and unknown information. Preserve contradictions instead of silently choosing the more attractive story.',
     'A missing record is not proof of fraud; a lack of contradiction is not proof of authenticity. Explain the limits of the search and what evidence would resolve uncertainty.',
@@ -536,7 +535,8 @@ export default async (request: Request) => {
     }
 
     normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
-    const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations)
+    const sourceLineage = analyzeSourceLineage(extracted.citations)
+    const guarded = applyVerdictEvidenceGuard(analysis, extracted.citations, sourceLineage)
     const identityIdentifiers = [...new Map(
       records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
         .map(item => [item.identifier_type + ':' + item.normalized_value, item])
@@ -562,10 +562,11 @@ export default async (request: Request) => {
       identity_identifiers: identityIdentifiers,
       curated_market_comparables: marketData,
       citations: extracted.citations,
+      source_lineage: sourceLineage,
       verdict_guard: {
         applied: guarded.applied,
         reasons: guarded.reasons,
-        policy: 'GOOD requires at least two distinct cited publisher domains, two strong source assessments, confidence >= 0.80, and no unresolved conflicts or unknowns. BAD requires at least two distinct cited publisher domains, one strong source assessment, and an explicit conflict. Failing either gate downgrades to UNCERTAIN. These are conservative triage signals, not proof of source independence.',
+        policy: 'GOOD requires at least two publisher domains remaining as corroboration candidates after same-publisher and syndication screening, two strong source assessments, confidence >= 0.80, and no unresolved conflicts or unknowns. BAD requires at least two such publisher domains, one strong source assessment, and an explicit conflict. Failing either gate downgrades to UNCERTAIN. Candidate domains are not proven independent; human review must trace shared ownership, wires and primary sources.',
       },
       checkedAt: new Date().toISOString(),
       model,
