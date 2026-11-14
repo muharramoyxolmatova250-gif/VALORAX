@@ -3,7 +3,7 @@
 ## Foundational rule
 
 > **Trust evidence, not the beauty of the asset.**  
-> A beautiful car is not proof. A prestigious badge is not proof. A high price is not proof. A confident seller is not proof.
+> Even the world's most expensive car receives no positive verdict without evidence. A beautiful car is not proof. A prestigious badge is not proof. A high price is not proof. A confident seller is not proof.
 
 OMNISIGHT evaluates claims against traceable evidence. It must not be persuaded by appearance, brand prestige, rarity language, asking price, seller reputation, or emotional presentation.
 
