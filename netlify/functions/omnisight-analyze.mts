@@ -146,7 +146,7 @@ function applyGoodVerdictGuard(
 
 function expectedEvidenceChecklist(assetName: string) {
   const name = assetName.toLowerCase()
-  if (/ferrari|pagani|bugatti|porsche|mclaren|lamborghini|mercedes|aston martin|bentley|rolls.?royce|\\bcar\\b|\\bcars\\b|automobile|vehicle|hypercars?/i.test(name)) {
+  if (/ferrari|pagani|bugatti|porsche|mclaren|lamborghini|mercedes|aston martin|bentley|rolls.?royce|\bcar\b|\bcars\b|automobile|vehicle|hypercars?/i.test(name)) {
     return {
       asset_class: 'automotive',
       expected_traces: [
