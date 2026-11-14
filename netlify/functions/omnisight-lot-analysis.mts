@@ -102,7 +102,7 @@ export default async () => {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(50_000),
+      signal: AbortSignal.timeout(22_000),
       body: JSON.stringify({
         model,
         tools: [{ type: 'web_search', search_context_size: 'medium' }],
