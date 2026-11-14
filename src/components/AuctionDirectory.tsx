@@ -250,6 +250,33 @@ function LotCard({
           )}
         </div>
 
+        {/* OMNISIGHT report state */}
+        <div className="flex items-center justify-between text-[8px] tracking-widest uppercase">
+          <span className="text-white/35">OMNISIGHT INTELLIGENCE</span>
+          <span
+            className="font-bold"
+            style={{
+              color: lot.aiStatus === 'completed'
+                ? '#34D399'
+                : lot.aiStatus === 'partial'
+                  ? '#D4AF37'
+                  : 'rgba(255,255,255,0.45)',
+            }}
+          >
+            {lot.aiStatus === 'completed'
+              ? 'ANALYSIS COMPLETE'
+              : lot.aiStatus === 'partial'
+                ? 'PARTIAL ANALYSIS'
+                : lot.aiStatus === 'running'
+                  ? 'ANALYZING'
+                  : lot.aiStatus === 'queued'
+                    ? 'ANALYSIS QUEUED'
+                    : lot.aiStatus === 'failed'
+                      ? 'ANALYSIS FAILED'
+                      : 'AWAITING ANALYSIS'}
+          </span>
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-2 gap-2">
           <div
