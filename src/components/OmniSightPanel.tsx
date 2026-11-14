@@ -6,6 +6,22 @@ import type { AuctionLot } from '../types'
 
 const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
 
+type AnalysisResponse = {
+  analysis: {
+    verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
+    confidence: number
+    summary: string
+    conflicts: Array<{ topic: string; evidence_a: string; evidence_b: string; significance: string }>
+    source_assessments: Array<{ source: string; finding: string; reliability: 'strong' | 'medium' | 'weak' | 'unknown' }>
+    unknowns: string[]
+    next_checks: string[]
+  }
+  citations: Array<{ title: string; url: string }>
+  checkedAt: string
+  model: string
+  disclaimer: string
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -35,6 +51,9 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
   const [sourceUrl, setSourceUrl] = useState('')
   const [status, setStatus] = useState<EvidenceStatus>('seller_claim')
   const [error, setError] = useState('')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
 
   useEffect(() => {
     try {
@@ -45,6 +64,35 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
   }, [records])
 
   const audit = useMemo(() => auditEvidence(records), [records])
+
+  const runAnalysis = async () => {
+    setAnalysisError('')
+    setAnalysisResult(null)
+    if (records.length === 0) {
+      setAnalysisError('Add at least one evidence record before analysis.')
+      return
+    }
+
+    const assetNameForAnalysis = records[0].assetName
+    const assetRecords = records.filter(record => record.assetName === assetNameForAnalysis).slice(0, 12)
+    setAnalysisLoading(true)
+    try {
+      const response = await fetch('/api/omnisight/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetName: assetNameForAnalysis, records: assetRecords }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(typeof payload.error === 'string' ? payload.error : 'Analysis request failed.')
+      }
+      setAnalysisResult(payload as AnalysisResponse)
+    } catch (caught) {
+      setAnalysisError(caught instanceof Error ? caught.message : 'Could not complete analysis.')
+    } finally {
+      setAnalysisLoading(false)
+    }
+  }
 
   const importLotEvidence = (lot: AuctionLot) => {
     const record: EvidenceRecord = {
@@ -137,6 +185,47 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
             </div>
           ))}
         </div>
+
+        <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold tracking-widest text-white">SERVER-SIDE INTELLIGENCE</h2>
+              <p className="mt-1 text-xs text-white/40">Research sources, compare claims and identify evidence conflicts</p>
+            </div>
+            <button type="button" onClick={runAnalysis} disabled={analysisLoading || records.length === 0} className="rounded-md bg-gradient-to-r from-[#D4AF37] to-[#A98522] px-4 py-3 text-[10px] font-black tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40">
+              {analysisLoading ? 'RESEARCHING...' : 'ANALYZE LATEST ASSET'}
+            </button>
+          </div>
+          {analysisError && <p role="alert" className="mt-3 text-xs text-red-300">{analysisError}</p>}
+          {analysisResult && (
+            <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`rounded border px-3 py-1 text-xs font-black tracking-widest ${analysisResult.analysis.verdict === 'BAD' ? 'border-red-400/40 text-red-300' : analysisResult.analysis.verdict === 'GOOD' ? 'border-emerald-400/40 text-emerald-300' : 'border-amber-300/40 text-amber-200'}`}>{analysisResult.analysis.verdict}</span>
+                <span className="text-[10px] text-white/40">Confidence: {Math.round(analysisResult.analysis.confidence * 100)}%</span>
+                <span className="text-[10px] text-white/30">{new Date(analysisResult.checkedAt).toLocaleString()}</span>
+              </div>
+              <p className="text-sm leading-relaxed text-white/80">{analysisResult.analysis.summary}</p>
+              {analysisResult.analysis.conflicts.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-[10px] font-bold tracking-widest text-red-200">POTENTIAL CONFLICTS</h3>
+                  <div className="space-y-2">
+                    {analysisResult.analysis.conflicts.map((item, index) => <div key={index} className="rounded border border-red-300/15 bg-red-300/[0.04] p-3 text-xs text-white/70"><strong className="text-white">{item.topic}</strong><p className="mt-1">A: {item.evidence_a}</p><p>B: {item.evidence_b}</p><p className="mt-1 text-white/45">{item.significance}</p></div>)}
+                  </div>
+                </div>
+              )}
+              {analysisResult.analysis.source_assessments.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-[10px] font-bold tracking-widest text-[#D4AF37]">SOURCE ASSESSMENTS</h3>
+                  <ul className="space-y-2">{analysisResult.analysis.source_assessments.map((item,index)=><li key={index} className="text-xs text-white/65"><strong className="text-white">{item.source}</strong> · {item.reliability} — {item.finding}</li>)}</ul>
+                </div>
+              )}
+              {analysisResult.analysis.unknowns.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-amber-200">UNKNOWNS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.unknowns.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+              {analysisResult.analysis.next_checks.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">NEXT CHECKS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.next_checks.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+              {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
+              <p className="border-t border-white/10 pt-3 text-[10px] leading-relaxed text-white/30">{analysisResult.disclaimer}</p>
+            </div>
+          )}
+        </section>
 
         <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
