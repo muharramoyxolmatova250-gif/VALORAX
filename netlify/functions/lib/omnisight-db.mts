@@ -2,6 +2,41 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type OmnisightDb = SupabaseClient
 
+export type ExtractedAssetIdentifier = {
+  identifier_type: 'vin_or_chassis' | 'production_serial'
+  value: string
+  normalized_value: string
+}
+
+export function extractAssetIdentifiers(text: string): ExtractedAssetIdentifier[] {
+  const found = new Map<string, ExtractedAssetIdentifier>()
+  const vin = /\\b([A-HJ-NPR-Z0-9]{17})\\b/g
+  for (const match of text.matchAll(vin)) {
+    const value = match[1].toUpperCase()
+    found.set('vin_or_chassis:' + value, {
+      identifier_type: 'vin_or_chassis',
+      value,
+      normalized_value: value,
+    })
+  }
+
+  const serialPatterns = [
+    /(?:serial(?:\\s+no\\.?|\\s+number)?|production\\s+serial)\\s*[:#-]?\\s*(\\d{1,3}\\s*\\/\\s*\\d{1,3})/gi,
+    /(?:numbered|number)\\s+(\\d{1,3})\\s+(?:of|out of)\\s+(\\d{1,3})/gi,
+  ]
+  for (const pattern of serialPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = match[1].replace(/\\s+/g, '')
+      found.set('production_serial:' + value, {
+        identifier_type: 'production_serial',
+        value,
+        normalized_value: value,
+      })
+    }
+  }
+  return [...found.values()]
+}
+
 export function createOmnisightAdmin(): OmnisightDb {
   const url = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -74,7 +109,7 @@ export async function persistOmnisightResearch(
     source_name: record.sourceName,
     source_url: record.sourceUrl || null,
     evidence_status: record.status,
-    recorded_at: record.recordedAt ? new Date(record.recordedAt).toISOString() : null,
+    recorded_at: record.recordedAt && Number.isFinite(Date.parse(record.recordedAt)) ? new Date(record.recordedAt).toISOString() : null,
   }))
   const { data: evidence, error: evidenceError } = await db
     .from('omnisight_evidence')
@@ -102,12 +137,44 @@ export async function persistOmnisightResearch(
     entity_type: 'asset', canonical_key: assetKey, label: input.assetName, attributes: { asset_id: asset.id },
   })
 
+  const evidenceByClientId = new Map(evidence.map(row => [row.client_record_id, row.id]))
+  for (const record of input.records) {
+    const evidenceId = evidenceByClientId.get(record.id)
+    if (!evidenceId) continue
+    for (const identifier of extractAssetIdentifiers([record.claim, record.sourceName].join(' '))) {
+      const key = identifier.identifier_type + ':' + identifier.normalized_value
+      const identifierId = entityIds.get(key)
+      if (!identifierId) continue
+      relationships.push({
+        owner_id: userId,
+        from_entity_id: assetIdsafe(entityIds, assetKey),
+        to_entity_id: identifierId,
+        relationship_type: 'identifier_mentioned_in_submitted_record',
+        evidence_id: evidenceId,
+        analysis_id: savedAnalysis.id,
+        confidence: 0,
+        review_status: 'candidate',
+      })
+    }
+  }
   for (const record of evidence) {
     const host = safeHost(record.source_url || '')
     if (host) entities.set('source:' + host, {
       entity_type: 'source', canonical_key: host, label: host, attributes: { hostname: host },
     })
   }
+  for (const record of input.records) {
+    for (const identifier of extractAssetIdentifiers([record.claim, record.sourceName].join(' '))) {
+      const key = identifier.identifier_type + ':' + identifier.normalized_value
+      entities.set(key, {
+        entity_type: 'identifier',
+        canonical_key: key,
+        label: identifier.value,
+        attributes: { identifier_type: identifier.identifier_type, normalized_value: identifier.normalized_value },
+      })
+    }
+  }
+
   for (const citation of input.citations) {
     const host = safeHost(citation.url)
     if (host) entities.set('source:' + host, {
