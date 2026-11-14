@@ -39,21 +39,22 @@ A controlled research case for testing identity resolution, model-vs-asset scope
 2. Never infer `3/30` from the trailing `003` in the VIN.
 3. Preserve exact currency and auction-house published result.
 4. Do not use the Paris chassis 005 result as the target car's sale history.
+5. Preserve the CHF 5,292,500 secondary media-centre discrepancy against the primary RM result; label its scope unresolved and do not invent an explanation.
 6. Manufacturer model specifications cannot establish the target chassis identity.
 7. Do not call the target physically authentic, legally titled, mechanically sound or investment-grade based only on public catalogues.
-7. If the research cannot establish exact identity and relevant provenance, the overall verdict should remain `UNCERTAIN`.
+8. If the research cannot establish exact identity and relevant provenance, the overall verdict should remain `UNCERTAIN`.
 
 ## Known research limitations
 - The RM Sotheby's page is a primary source for what the auction house catalogued and published as the result; it is not independent proof of payment settlement, legal transfer, or physical condition.
 - The Pagani page is primary for manufacturer-published model specifications and production limit; it is not a chassis-specific certificate.
 - No Pagani factory build sheet, current physical inspection, title/registration dossier or full chain of custody is included in this public-source case.
-- A separate media-centre image record contains a different number that appears to include a simulator package. It is excluded from the vehicle-only sale result unless the auction house explicitly clarifies the package and accounting.
+- A separate media-centre image record contains a different number whose scope is unclear. It is excluded from the vehicle-only sale result unless the auction house clarifies whether it represents a different package, an accounting distinction or a data error.
 
 ## Manual live-run procedure
 1. Apply the Supabase migration in `supabase/migrations/202611140001_omnisight_intelligence.sql`.
 2. Configure the required Netlify environment variables described in `docs/OMNISIGHT_ENGINEERING_SPEC.md`.
 3. Sign in using a Supabase magic link.
-4. Add the two target evidence records from `tests/fixtures/pagani-huayra-r.json` (do not add the Paris comparable as target provenance).
+4. Add the three target/discrepancy evidence records from `tests/fixtures/pagani-huayra-r.json` (do not add the Paris comparable as target provenance).
 5. Run the server analysis.
 6. Compare every claim and citation against the acceptance checks above.
 7. Save the returned report ID and review any false positives, false negatives, missing citations and incorrect identity joins.
