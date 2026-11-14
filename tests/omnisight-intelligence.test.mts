@@ -2,7 +2,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { normalizeFinding } from '../netlify/functions/lib/intelligence-guard.mts'
-import { extractAssetIdentifiers } from '../netlify/functions/lib/omnisight-db.mts'
+import { extractAssetIdentifiers, resolveAssetCanonicalKey } from '../netlify/functions/lib/omnisight-db.mts'
 
 const citation = 'https://example.com/verified-record'
 const allowed = new Set([citation])
@@ -87,4 +87,20 @@ test('Pagani real-source fixture keeps target chassis, production serial and com
   assert.match(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76005/)
   assert.doesNotMatch(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76003/)
   assert.ok(fixture.expected_invariants.some(item => item.includes('CHF 2,367,500')))
+})
+
+test('resolves an asset to a VIN key only when exactly one distinct VIN is present', () => {
+  const single = resolveAssetCanonicalKey('2022 Pagani Huayra R', [
+    'Chassis No. ZA9H11WTYYSF76003; Serial No. 11/30',
+    'VIN ZA9H11WTYYSF76003',
+  ])
+  assert.equal(single.canonicalKey, 'identifier-za9h11wtyysf76003')
+  assert.equal(single.identityState, 'single_vin_candidate')
+
+  const multiple = resolveAssetCanonicalKey('2022 Pagani Huayra R', [
+    'Chassis No. ZA9H11WTYYSF76003; Serial No. 11/30',
+    'Chassis No. ZA9H11WTYYSF76005; Serial No. 5/30',
+  ])
+  assert.equal(multiple.canonicalKey, 'model-2022-pagani-huayra-r')
+  assert.equal(multiple.identityState, 'multiple_vin_candidates')
 })
