@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions'
+import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 
 type IncomingEvidence = {
   id: string
@@ -143,39 +144,9 @@ function applyGoodVerdictGuard(
   }
 }
 
-function sanitizeFindingReferences(finding: IntelligenceFinding, allowedUrls: Set<string>): IntelligenceFinding {
-  const validRefs = finding.evidence_refs.filter(url => {
-    try { return allowedUrls.has(new URL(url).href) } catch { return false }
-  })
-  const invalidCount = finding.evidence_refs.length - validRefs.length
-  if (invalidCount === 0) return { ...finding, evidence_refs: validRefs }
-  return {
-    ...finding,
-    status: finding.status === 'NOT_APPLICABLE' ? 'NOT_APPLICABLE' : 'PARTIAL',
-    confidence: Math.min(finding.confidence, 0.49),
-    evidence_refs: validRefs,
-    limitations: [
-      ...finding.limitations,
-      'One or more claimed evidence references did not match URLs actually returned by web search and were removed.',
-    ],
-  }
-}
-
-function sanitizeIntelligenceReferences(analysis: AnalysisResult, citations: Array<{ title: string; url: string }>) {
-  const allowedUrls = new Set(citations.map(item => {
-    try { return new URL(item.url).href } catch { return '' }
-  }).filter(Boolean))
-  for (const finding of Object.values(analysis.intelligence)) {
-    Object.assign(finding, sanitizeFindingReferences(finding, allowedUrls))
-  }
-  for (const finding of Object.values(analysis.advanced_analysis)) {
-    Object.assign(finding, sanitizeFindingReferences(finding, allowedUrls))
-  }
-}
-
 function expectedEvidenceChecklist(assetName: string) {
   const name = assetName.toLowerCase()
-  if (/ferrari|pagani|bugatti|porsche|mclaren|lamborghini|mercedes|aston martin|bentley|rolls.?royce|car|automobile|vehicle|hyperc(ar|ar)/.test(name)) {
+  if (/ferrari|pagani|bugatti|porsche|mclaren|lamborghini|mercedes|aston martin|bentley|rolls.?royce|\\bcar\\b|\\bcars\\b|automobile|vehicle|hypercars?/i.test(name)) {
     return {
       asset_class: 'automotive',
       expected_traces: [
@@ -270,8 +241,8 @@ export default async (request: Request) => {
     }
   }
 
-  const length = Number(request.headers.get('content-length') || 0)
-  if (length > 40_000) return json({ error: 'Request is too large.' }, 413)
+  const declaredLength = Number(request.headers.get('content-length') || 0)
+  if (declaredLength > 40_000) return json({ error: 'Request is too large.' }, 413)
 
   const ip = request.headers.get('x-nf-client-connection-ip')
     || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -290,7 +261,11 @@ export default async (request: Request) => {
 
   let body: { assetName?: unknown; records?: unknown }
   try {
-    body = await request.json()
+    const rawBody = await request.text()
+    if (new TextEncoder().encode(rawBody).byteLength > 40_000) {
+      return json({ error: 'Request is too large.' }, 413)
+    }
+    body = JSON.parse(rawBody) as { assetName?: unknown; records?: unknown }
   } catch {
     return json({ error: 'Invalid JSON request.' }, 400)
   }
@@ -314,6 +289,21 @@ export default async (request: Request) => {
     status: cleanText(record.status, 40),
     recordedAt: cleanText(record.createdAt, 40),
   }))
+
+  if (records.some(record => record.assetName !== assetName)) {
+    return json({ error: 'All evidence records must refer to the same exact asset name.' }, 400)
+  }
+  for (const record of records) {
+    if (!record.sourceUrl) continue
+    try {
+      const sourceUrl = new URL(record.sourceUrl)
+      if (!['http:', 'https:'].includes(sourceUrl.protocol)) {
+        return json({ error: 'Evidence source URLs must use HTTP or HTTPS.' }, 400)
+      }
+    } catch {
+      return json({ error: 'One or more evidence source URLs are invalid.' }, 400)
+    }
+  }
 
   const expectedChecklist = expectedEvidenceChecklist(assetName)
 
@@ -457,7 +447,7 @@ export default async (request: Request) => {
       return json({ error: 'AI returned an invalid verdict.' }, 502)
     }
 
-    sanitizeIntelligenceReferences(analysis, extracted.citations)
+    normalizeIntelligence(analysis.intelligence, analysis.advanced_analysis, extracted.citations)
     const guarded = applyGoodVerdictGuard(analysis, extracted.citations)
 
     return json({
