@@ -37,6 +37,28 @@ type AnalysisResponse = {
     record_ids: string[]
     note: string
   }>
+  curated_market_comparables: {
+    records: Array<{
+      make: string
+      model: string
+      model_year: number | null
+      chassis_identifier: string | null
+      production_serial: string | null
+      auction_house: string
+      auction_name: string
+      lot_number: string | null
+      sale_date: string | null
+      event_start: string | null
+      event_end: string | null
+      location: string | null
+      sale_amount: number
+      currency: string
+      result_status: 'sold' | 'unsold' | 'withdrawn'
+      source_url: string
+      source_title: string
+    }>
+    queryState: 'make_not_recognized' | 'rights_cleared_records_found' | 'no_rights_cleared_records'
+  }
   identity_identifiers: Array<{
     identifier_type: 'vin_or_chassis' | 'production_serial'
     value: string
@@ -358,6 +380,29 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                   </div>
                 )}
                 <p className="mt-3 text-[10px] text-white/35">Public registry: {analysisResult.persistence.globalAssetId ? 'matched curated asset' : 'no curated exact-asset match'} · Identity key: {analysisResult.persistence.identityState.replace(/_/g, ' ')} · Saved evidence: {analysisResult.persistence.evidenceCount} · Private graph: {analysisResult.persistence.graphEntityCount} entities / {analysisResult.persistence.graphRelationshipCount} links · Global sources indexed: {analysisResult.persistence.globalSourceCount}</p>
+              </section>
+              <section className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">CURATED HISTORICAL SALES</h3>
+                  <span className="text-[10px] text-white/35">{analysisResult.curated_market_comparables.records.length} rights-cleared records</span>
+                </div>
+                {analysisResult.curated_market_comparables.records.length === 0 ? (
+                  <p className="mt-2 text-xs leading-relaxed text-white/45">No rights-cleared comparable sales are currently available in the database. This does not mean no historical sales exist; use the cited public auction research separately.</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {analysisResult.curated_market_comparables.records.map((sale, index) => (
+                      <div key={sale.source_url} className="rounded border border-white/10 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-white">{sale.model_year || ''} {sale.make} {sale.model} · {sale.production_serial || 'serial not recorded'}</span>
+                          <span className="font-mono text-xs text-[#D4AF37]">{sale.currency} {sale.sale_amount.toLocaleString()}</span>
+                        </div>
+                        <p className="mt-1 text-[10px] text-white/45">{sale.auction_house} · {sale.auction_name} · {sale.sale_date || 'sale day not recorded'} · {sale.result_status.toUpperCase()}</p>
+                        <p className="mt-1 text-[10px] text-white/40">Chassis: {sale.chassis_identifier || 'not recorded'} · Lot: {sale.lot_number || 'not recorded'}</p>
+                        <a href={sale.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] text-[#D4AF37] hover:underline">{sale.source_title}</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
               <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
                 <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replace(/_/g, ' ')}</h3>
