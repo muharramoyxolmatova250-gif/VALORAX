@@ -16,6 +16,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       subtitle: lot.subtitle || '',
       category: lot.category || 'Luxury',
       image: lot.image || '',
+      imageSourceUrl: lot.imageSourceUrl || '',
       currentBid: Number(lot.currentBid ?? 0),
       reserve: Number(lot.reserve ?? 0),
       escrow: 0,
