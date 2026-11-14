@@ -67,6 +67,18 @@ export async function consumeOmnisightCredit(db: OmnisightDb, userId: string) {
   return data[0] as { allowed: boolean; used: number; monthly_limit: number; resets_at: string }
 }
 
+export function resolveAssetCanonicalKey(assetName: string, recordTexts: string[]) {
+  const modelKey = assetName.normalize('NFKC').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 160)
+  const identifiers = recordTexts.flatMap(text => extractAssetIdentifiers(text))
+  const exactVins = [...new Set(identifiers
+    .filter(item => item.identifier_type === 'vin_or_chassis')
+    .map(item => item.normalized_value))]
+  return {
+    canonicalKey: exactVins.length === 1 ? 'identifier-' + exactVins[0].toLowerCase() : 'model-' + modelKey,
+    identityState: exactVins.length === 1 ? 'single_vin_candidate' : exactVins.length > 1 ? 'multiple_vin_candidates' : 'model_only',
+  }
+}
+
 function canonicalKey(value: string) {
   return value.normalize('NFKC').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 160)
 }
@@ -86,15 +98,16 @@ export async function persistOmnisightResearch(
     model: string
   },
 ) {
-  const submittedIdentifiers = input.records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
-  const exactVins = [...new Set(submittedIdentifiers
-    .filter(item => item.identifier_type === 'vin_or_chassis')
-    .map(item => item.normalized_value))]
   const modelKey = canonicalKey(input.assetName)
   if (!modelKey) throw new Error('OMNISIGHT_ASSET_KEY_EMPTY')
   // Use a chassis/VIN key only when the submitted evidence agrees on exactly one.
   // Multiple conflicting identifiers stay on a model-level key and remain unresolved.
-  const assetKey = exactVins.length === 1 ? 'identifier-' + exactVins[0].toLowerCase() : 'model-' + modelKey
+  const identityResolution = resolveAssetCanonicalKey(
+    input.assetName,
+    input.records.map(record => [record.claim, record.sourceName].join(' ')),
+  )
+  const submittedIdentifiers = input.records.flatMap(record => extractAssetIdentifiers([record.claim, record.sourceName].join(' ')))
+  const assetKey = identityResolution.canonicalKey
 
   const assetClass = /pagani|ferrari|bugatti|porsche|mclaren|lamborghini|\bcar\b|vehicle/i.test(input.assetName) ? 'automotive' : 'unclassified'
   const { data: globalAsset, error: globalAssetError } = await db
@@ -285,7 +298,7 @@ export async function persistOmnisightResearch(
     if (relationError) throw new Error('OMNISIGHT_GRAPH_RELATION_PERSIST_FAILED')
   }
 
-  return { globalAssetId: globalAsset.id, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
+  return { globalAssetId: globalAsset.id, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
 }
 
 function assetIdsafe(entityIds: Map<string, string>, assetKey: string) {
