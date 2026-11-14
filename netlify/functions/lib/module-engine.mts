@@ -21,6 +21,15 @@ export type ModuleSignal = {
   limitations: string[]
   conflicts?: Array<{ attribute: string; values: string[]; record_ids: string[]; source_domains: string[] }>
 }
+export type CrossAssetLink = {
+  related_asset: string
+  related_asset_key: string
+  shared_entity: string
+  shared_entity_type: string
+  relationship_type: string
+  evidence_id: string | null
+  review_status: string
+}
 export type DeterministicModuleReport = {
   generated_by: 'deterministic_rules_v1'
   modules: {
@@ -62,8 +71,9 @@ export function buildDeterministicModuleReport(input: {
   assetName: string
   records: ModuleEvidence[]
   sales: ModuleSale[]
+  crossAssetLinks?: CrossAssetLink[]
 }): DeterministicModuleReport {
-  const { records, sales } = input
+  const { records, sales, crossAssetLinks = [] } = input
   const textOf = (r: ModuleEvidence) => [r.claim, r.sourceName, r.sourceUrl].join(' ')
   const ids = (pattern: RegExp) => records.filter(r => pattern.test(textOf(r))).map(r => r.id)
   const identityIds = ids(/\b(vin|chassis|serial|reference number|build number|engine number)\b/i)
@@ -116,10 +126,16 @@ export function buildDeterministicModuleReport(input: {
         ['No alternative history is asserted as fact by the deterministic engine.', 'Counterfactual scenarios require a clearly defined event or claim to test.'],
         ['Define one falsifiable alternative scenario.', 'Identify primary records that would support or disconfirm it.', 'Keep hypothetical consequences separate from documented history.'],
         [], ['This module does not generate historical facts from hypothetical scenarios.']),
-      cross_asset_connections: make('Cross-Asset Connection Discovery', 'NO_SIGNAL',
-        ['The submitted ledger is scoped to one named asset; no independently identified second asset is supplied for deterministic linking.'],
-        ['Compare exact VIN/serial, owner, event, document and auction identifiers across separately researched assets.', 'Require a source-backed relationship; model-name similarity is not a connection.'],
-        [], ['No connection is inferred from shared brand or model name. A persistent multi-asset graph is not queried by this function.']),
+      cross_asset_connections: {
+        ...make('Cross-Asset Connection Discovery', crossAssetLinks.length ? 'ACTIONABLE' : 'NO_SIGNAL',
+          crossAssetLinks.length
+            ? crossAssetLinks.map(link => `Saved research links this asset to ${link.related_asset} through shared ${link.shared_entity_type}: ${link.shared_entity} (${link.review_status}).`)
+            : ['No evidence-linked shared entity with another saved asset was found in this user\'s OMNISIGHT graph.'],
+          ['Review the original evidence attached to each shared entity.', 'Distinguish a shared auction house or marque from a meaningful owner, event or document connection.', 'Promote a relationship only after human review of the underlying records.'],
+          unique(crossAssetLinks.map(link => link.evidence_id || '').filter(Boolean)),
+          ['Only this user\'s saved OMNISIGHT graph is searched; no global or private external database is queried.', 'A shared entity is a research lead, not proof of common ownership or wrongdoing.']),
+        connections: crossAssetLinks,
+      },
       evidence_conflict_engine: {
         ...make('Evidence Conflict Engine', detectedConflicts.length || allDisputed.length ? 'ACTIONABLE' : 'LIMITED',
           detectedConflicts.length ? detectedConflicts.map(conflict => `Conflicting submitted values for ${conflict.attribute}: ${conflict.values.join(' vs ')}.`) : allDisputed.length ? [`${allDisputed.length} submitted record(s) are explicitly marked disputed; no machine-comparable attribute conflict was extracted.`] : ['No machine-comparable contradiction was detected in the submitted ledger. This does not prove all claims agree.'],
