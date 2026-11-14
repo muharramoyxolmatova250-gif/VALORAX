@@ -220,7 +220,7 @@ export async function persistOmnisightResearch(
   // This records discovery, not factual verification or claim support.
   const citationDomains = [...new Set(input.citations.map(item => safeHost(item.url)).filter(Boolean))]
   let globalSourceCount = 0
-  if (input.citations.length > 0) {
+  if (globalAsset && input.citations.length > 0) {
     const sourceRows = citationDomains.map(domain => ({
       domain,
       display_name: domain,
@@ -232,7 +232,7 @@ export async function persistOmnisightResearch(
     if (globalSourceError || !globalSources) throw new Error('OMNISIGHT_GLOBAL_SOURCE_PERSIST_FAILED')
 
     const sourceIds = new Map(globalSources.map(source => [source.domain, source.id]))
-    const globalLinks = globalAsset ? input.citations.flatMap(citation => {
+    const globalLinks = input.citations.flatMap(citation => {
       const domain = safeHost(citation.url)
       const sourceId = sourceIds.get(domain)
       if (!sourceId) return []
@@ -245,7 +245,7 @@ export async function persistOmnisightResearch(
         evidence_state: 'search_returned',
         last_seen_at: new Date().toISOString(),
       }]
-    }) : []
+    })
     if (globalLinks.length) {
       const { error: linkError } = await db
         .from('omnisight_global_asset_sources')
