@@ -6,7 +6,7 @@ import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
 import { summarizeComparableSales } from './lib/market-intelligence.mjs'
 import { extractOpenAiResponse } from './lib/openai-response.mjs'
-import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch, findCrossAssetConnections } from './lib/omnisight-db.mjs'
 
 type IntelligenceFinding = {
   status: 'SUPPORTED' | 'PARTIAL' | 'NOT_FOUND' | 'CONFLICT' | 'NOT_APPLICABLE'
@@ -493,11 +493,24 @@ export default async (request: Request) => {
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
-    const deterministicModules = buildDeterministicModuleReport({ assetName, records, sales: marketData.records })
+    let crossAssetDiscovery = {
+      state: 'NO_SIGNAL' as const,
+      links: [] as Array<{ related_asset: string; related_asset_key: string; shared_entity: string; shared_entity_type: string; relationship_type: string; evidence_id: string | null; review_status: string }>,
+      limitations: ['Saved graph discovery was not available for this run.'],
+    }
+    try {
+      crossAssetDiscovery = await findCrossAssetConnections(db, user.id, assetName, records)
+    } catch (error) {
+      console.error('OMNISIGHT cross-asset lookup failed:', error instanceof Error ? error.message : 'unknown')
+    }
+    const deterministicModules = buildDeterministicModuleReport({
+      assetName, records, sales: marketData.records, crossAssetLinks: crossAssetDiscovery.links,
+    })
 
     return json({
       analysis: analysisWithUsage,
       deterministic_modules: deterministicModules,
+      cross_asset_discovery: crossAssetDiscovery,
       expected_evidence_checklist: expectedChecklist,
       submitted_evidence_coverage: submittedCoverage,
       negative_space_audit: negativeSpaceAudit,
