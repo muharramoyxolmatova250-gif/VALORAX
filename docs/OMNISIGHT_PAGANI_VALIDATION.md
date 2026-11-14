@@ -28,13 +28,19 @@ A controlled research case for testing identity resolution, model-vs-asset scope
 - Published result: `EUR 3,042,500 | Sold`.
 - This is a different physical car. It must not be merged into the target's identity or provenance.
 
+### Conflicting secondary price signal
+- URL: https://barchetta.mediacenter.plus/?i=6312200
+- The media-centre image record for Zurich lot 132 displays `Sold CHF 5,292,500`, which conflicts with the RM Sotheby's primary lot page's `CHF 2,367,500 | Sold`.
+- The media-centre record does not clearly establish the scope of its number. Treat it as an unresolved, lower-context conflicting signal.
+- Do not silently substitute it for the auction-house lot result and do not speculate that it includes the simulator; the source does not establish that explanation.
+
 ## Deterministic acceptance checks
 1. Extract chassis/VIN and factory production serial into different typed identifiers.
 2. Never infer `3/30` from the trailing `003` in the VIN.
 3. Preserve exact currency and auction-house published result.
 4. Do not use the Paris chassis 005 result as the target car's sale history.
-5. Manufacturer model specifications cannot establish the target chassis identity.
-6. Do not call the target physically authentic, legally titled, mechanically sound or investment-grade based only on public catalogues.
+6. Manufacturer model specifications cannot establish the target chassis identity.
+7. Do not call the target physically authentic, legally titled, mechanically sound or investment-grade based only on public catalogues.
 7. If the research cannot establish exact identity and relevant provenance, the overall verdict should remain `UNCERTAIN`.
 
 ## Known research limitations
