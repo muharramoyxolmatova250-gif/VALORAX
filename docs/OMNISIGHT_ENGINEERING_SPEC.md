@@ -13,10 +13,11 @@
 5. The server builds an asset-class expected-evidence checklist and a deterministic coverage map of topics present or absent from the submitted ledger.
 6. The server sends untrusted submitted claims plus explicit evidence-first instructions to the OpenAI Responses API with web search and strict JSON output.
 7. Citation URLs are extracted from actual web-search annotations.
-8. The deterministic finding guard removes citation URLs that were not returned by search, clamps confidence, and downgrades unsupported module statuses.
-9. The verdict gate can downgrade GOOD or BAD to UNCERTAIN. It never upgrades a verdict.
-10. The server persists the asset, evidence, report, citation sources, typed identifier entities and candidate graph relationships in Supabase using a server-only service-role key.
-11. The browser renders source citations, expected evidence, submitted-ledger coverage, module findings, exact identifiers, usage quota and verdict-gate reasoning.
+8. A server-side source-lineage screen normalizes URLs, collapses publisher domains, flags known press-release distribution platforms and identical normalized headlines across different publishers as possible syndication/dependency.
+9. The deterministic finding guard removes citation URLs that were not returned by search, clamps confidence, and downgrades unsupported module statuses.
+10. The verdict gate can downgrade GOOD or BAD to UNCERTAIN. It never upgrades a verdict; it requires at least two publisher domains remaining as corroboration candidates after dependency screening.
+11. The server persists the asset, evidence, report, citation sources, typed identifier entities and candidate graph relationships in Supabase using a server-only service-role key.
+12. The browser renders source citations, source-lineage warnings, expected evidence, submitted-ledger coverage, module findings, exact identifiers, usage quota and verdict-gate reasoning.
 
 ## Status semantics
 
@@ -25,6 +26,8 @@
 - `NOT_FOUND`: not located in the defined search, not proof that a record does not exist.
 - `CONFLICT`: sources disagree; the disagreement must be preserved.
 - `NOT_APPLICABLE`: the analysis does not apply to this asset or request.
+
+Source-lineage `independence_unverified` means only that the automatic screen did not identify a dependency warning. It does not mean the sources are confirmed independent. Different publisher domains may share owners, wires, PR material or undisclosed sources. Human source tracing is required.
 
 A submitted-ledger coverage result only means a supplied record matched a topic by keyword. It does not verify the truth or quality of that record.
 
