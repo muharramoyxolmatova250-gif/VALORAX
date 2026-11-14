@@ -145,7 +145,7 @@ export default async () => {
     const complete = missingModules.length === 0 && missingAdvanced.length === 0 && hasBothServices
 
     const domains = new Set(extracted.citations.map(item => {
-      try { return new URL(item.url).hostname.toLowerCase().replace(/^www\\./, '') } catch { return '' }
+      try { const host = new URL(item.url).hostname.toLowerCase(); return host.startsWith('www.') ? host.slice(4) : host } catch { return '' }
     }).filter(Boolean))
     const conflicts = Array.isArray(result.conflicts) ? result.conflicts : []
     const unknowns = Array.isArray(result.unknowns) ? result.unknowns : []
