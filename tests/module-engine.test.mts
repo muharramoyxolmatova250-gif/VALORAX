@@ -28,3 +28,20 @@ test('does not turn an empty market database into a claim that no sales exist', 
   assert.match(report.modules.valuation_intelligence.observations[0], /No eligible rights-cleared/)
   assert.match(report.modules.valuation_intelligence.limitations[1], /does not mean no sales exist/)
 })
+
+test('detects conflicting explicit production-count claims without choosing a winner', () => {
+  const report = buildDeterministicModuleReport({
+    assetName: 'Pagani Huayra R',
+    records: [
+      { id: 'factory', claim: 'Production of 30 units', sourceName: 'Manufacturer archive', sourceUrl: 'https://pagani.example/archive', status: 'source_observed' },
+      { id: 'seller', claim: 'Only 25 units built', sourceName: 'Seller listing', sourceUrl: 'https://seller.example/car', status: 'seller_claim' },
+    ],
+    sales: [],
+  })
+  const conflict = report.modules.evidence_conflict_engine
+  assert.equal(conflict.state, 'ACTIONABLE')
+  assert.equal(conflict.conflicts?.[0]?.attribute, 'claimed_production_total')
+  assert.deepEqual(conflict.conflicts?.[0]?.values, ['30', '25'])
+  assert.deepEqual(conflict.conflicts?.[0]?.record_ids, ['factory', 'seller'])
+  assert.match(conflict.limitations[1], /not proof that either source is correct/)
+})
