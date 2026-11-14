@@ -1,99 +1,80 @@
 import type { Config } from '@netlify/functions'
+import { createClient } from '@supabase/supabase-js'
+
+const MIN_VALUE_USD = 500_000
 
 export default async () => {
-  const apiKey = process.env.OCD_API_KEY
-
-  if (!apiKey) {
-    return Response.json(
-      { error: 'OCD_API_KEY sozlanmagan' },
-      { status: 500 }
-    )
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    return Response.json({ error: 'Public catalogue database is not configured.' }, { status: 503 })
   }
 
   try {
-    const url = new URL(
-      'https://api.oldcarsdata.com/auctions/live'
-    )
-
-    url.searchParams.set('sort', 'ending')
-    url.searchParams.set('direction', 'asc')
-    url.searchParams.set('limit', '10')
-    url.searchParams.set('price_min', '500000')
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: 'Bearer ' + apiKey,
-        Accept: 'application/json',
-      },
+    // Use only the public anon key. RLS is the publication gate; never use service-role credentials here.
+    const db = createClient(url, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     })
+    const { data, error } = await db
+      .from('omnisight_discovered_lots')
+      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,short_factual_summary,verification_status')
+      .in('listing_status', ['active', 'upcoming'])
+      .gte('published_value_usd', MIN_VALUE_USD)
+      .order('auction_ends_at', { ascending: true })
+      .limit(100)
 
-    const result = await response.json()
-
-    if (!response.ok) {
-      console.error('Old Cars Data API error:', response.status)
-
-      return Response.json(
-        {
-          error: 'Auction API so‘rovi muvaffaqiyatsiz',
-          status: response.status,
-        },
-        { status: response.status }
-      )
+    if (error) {
+      console.error('VALORAX catalogue query failed:', error.message)
+      return Response.json({ error: 'Catalogue is temporarily unavailable.' }, { status: 503 })
     }
 
-    const items = Array.isArray(result.data)
-      ? result.data
-      : Array.isArray(result)
-        ? result
-        : []
-
-    const lots = items.map((item: any) => {
-      const endValue = item.auction_end_at
-      const endDate = endValue
-        ? new Date(endValue).getTime()
-        : 0
-
-      return {
-        id: 'ocd-' + item.id,
-        title: item.title || 'Collector Car',
-        subtitle: [
-          item.year,
-          item.listing_make,
-          item.listing_model,
-        ].filter(Boolean).join(' '),
-        category: item.listing_make || 'Luxury',
-        image: item.featured_image_url || '',
-        currentBid: Number(item.price || 0),
-        reserve: 0,
-        escrow: 0,
-        secondsLeft: endDate
-          ? Math.max(
-              0,
-              Math.floor((endDate - Date.now()) / 1000)
-            )
-          : 0,
-        bids: Number(item.bid_count || 0),
-        verified: false,
-        creator: item.source || 'External auction',
-        source: item.source || 'Old Cars Data',
-        sourceUrl: item.url || '',
-        status: 'LIVE',
-        currency: 'USD',
+    const now = Date.now()
+    const lots = (data ?? []).flatMap((lot: any) => {
+      const endAt = lot.auction_ends_at ? new Date(lot.auction_ends_at).getTime() : NaN
+      const startAt = lot.auction_starts_at ? new Date(lot.auction_starts_at).getTime() : NaN
+      const value = Number(lot.published_value_usd)
+      const sourceUrl = typeof lot.canonical_url === 'string' ? lot.canonical_url : ''
+      const image = typeof lot.hero_image_url === 'string' ? lot.hero_image_url : ''
+      if (!Number.isFinite(value) || value < MIN_VALUE_USD || !Number.isFinite(endAt) || endAt <= now || !sourceUrl) return []
+      const status = Number.isFinite(startAt) && startAt > now ? 'UPCOMING' : 'LIVE'
+      const categoryMap: Record<string, string> = {
+        automotive: 'Cars',
+        watch: 'Watches',
+        jewelry: 'Jewelry',
+        art: 'Fine Art',
+        real_estate: 'Real Estate',
+        aircraft: 'Aircraft',
+        collectible: 'Collectibles',
       }
+      return [{
+        id: lot.id,
+        title: lot.title,
+        subtitle: [lot.model_year, lot.make, lot.model].filter(Boolean).join(' '),
+        category: categoryMap[lot.asset_class] || 'Luxury',
+        image,
+        currentBid: value,
+        reserve: value,
+        escrow: 0,
+        secondsLeft: Math.max(0, Math.floor((endAt - now) / 1000)),
+        bids: 0,
+        verified: lot.verification_status === 'human_reviewed',
+        creator: lot.auction_house || 'External auction',
+        source: lot.auction_house || 'Auction source',
+        sourceUrl,
+        status,
+        currency: 'USD',
+        publishedValueUsd: value,
+        valueBasis: lot.value_basis,
+        summary: lot.short_factual_summary || '',
+      }]
     })
 
     return Response.json(lots, {
-      headers: {
-        'Cache-Control': 'public, max-age=60',
-      },
+      headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' },
     })
   } catch (error) {
-    console.error('Auction API connection failed:', error)
-
-    return Response.json(
-      { error: 'Auction API bilan ulanish amalga oshmadi' },
-      { status: 502 }
-    )
+    console.error('VALORAX catalogue request failed:', error)
+    return Response.json({ error: 'Catalogue request failed.' }, { status: 502 })
   }
 }
 
