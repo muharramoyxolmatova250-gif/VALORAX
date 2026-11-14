@@ -100,19 +100,6 @@ function rateLimited(ip: string) {
  * Source-lineage screening and model-labelled reliability are signals, not proof of independence.
  * The gate only blocks weakly supported GOOD verdicts; it never upgrades a verdict.
  */
-function registrableHost(rawUrl: string): string | null {
-  try {
-    const hostname = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '')
-    if (!hostname || !hostname.includes('.')) return null
-    const labels = hostname.split('.')
-    const multiPartSuffixes = new Set(['co.uk', 'org.uk', 'com.au', 'net.au', 'co.nz', 'com.br', 'co.jp'])
-    const lastTwo = labels.slice(-2).join('.')
-    return multiPartSuffixes.has(lastTwo) ? labels.slice(-3).join('.') : lastTwo
-  } catch {
-    return null
-  }
-}
-
 function applyVerdictEvidenceGuard(
   analysis: AnalysisResult,
   citations: Array<{ title: string; url: string }>,
