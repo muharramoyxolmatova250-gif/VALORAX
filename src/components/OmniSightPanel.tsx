@@ -17,6 +17,7 @@ type DeterministicModuleSignal = {
   evidence_record_ids: string[]
   limitations: string[]
   conflicts?: Array<{ attribute: string; values: string[]; record_ids: string[]; source_domains: string[] }>
+  connections?: Array<{ related_asset: string; related_asset_key: string; shared_entity: string; shared_entity_type: string; relationship_type: string; evidence_id: string | null; review_status: string }>
 }
 type DeterministicModuleReport = {
   generated_by: 'deterministic_rules_v1'
@@ -548,6 +549,13 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                         {item.observations.map((line, index) => <p key={index} className="text-[10px] leading-relaxed text-white/70">{line}</p>)}
                       </div>
                       {item.evidence_record_ids.length > 0 && <p className="mt-2 text-[9px] text-emerald-200/60">MATCHED RECORDS: {item.evidence_record_ids.join(', ')}</p>}
+                      {item.connections?.map((connection, index) => (
+                        <div key={index} className="mt-2 rounded border border-sky-300/20 bg-sky-300/[0.04] p-2">
+                          <p className="text-[9px] font-bold tracking-wider text-sky-200">SAVED-GRAPH CONNECTION · {connection.review_status.toUpperCase()}</p>
+                          <p className="mt-1 text-[10px] text-white/75">{connection.related_asset} ↔ {connection.shared_entity} ({connection.shared_entity_type})</p>
+                          <p className="mt-1 text-[9px] text-white/40">{connection.relationship_type} · Evidence ID: {connection.evidence_id || 'not linked'}</p>
+                        </div>
+                      ))}
                       {item.conflicts?.map((conflict, index) => (
                         <div key={index} className="mt-2 rounded border border-amber-300/20 bg-amber-300/[0.04] p-2">
                           <p className="text-[9px] font-bold tracking-wider text-amber-200">CONFLICT CANDIDATE · {conflict.attribute.replace(/_/g, ' ')}</p>
