@@ -149,6 +149,7 @@ export default async (request: Request) => {
     'GOOD means the reviewed claims appear reasonably consistent with credible evidence; it does NOT mean the asset is authenticated.',
     'BAD means there is a material contradiction or substantiated red flag. UNCERTAIN is mandatory when evidence is thin, inaccessible or inconclusive.',
     'CORE PRINCIPLE: Trust evidence, never the beauty, prestige, price, rarity story, seller confidence or emotional appeal of an asset.',
+    'ABSOLUTE EVIDENCE GATE: Even the most expensive or prestigious car must never receive a positive verdict without credible, traceable evidence supporting the specific claims being reviewed. High value does not lower the proof threshold; if evidence is missing or insufficient, return UNCERTAIN.',
     'Visual appearance, brand prestige, celebrity ownership claims and a high asking price are not proof of identity, authenticity, provenance, condition or value.',
     'For every material claim, identify what the source actually supports, the exact asset identity it refers to, the source date, and whether the source is primary, independent or seller-controlled.',
     'Do not treat repeated copies of the same press release, catalogue text or seller statement as independent corroboration. Trace claims back to their original source where possible.',
