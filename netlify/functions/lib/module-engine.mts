@@ -36,7 +36,6 @@ export type DeterministicModuleReport = {
 const make = (module: string, state: ModuleSignal['state'], observations: string[], checks: string[], ids: string[] = [], limitations: string[] = []): ModuleSignal =>
   ({ module, state, observations, checks, evidence_record_ids: [...new Set(ids)], limitations })
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
-const dateOf = (value?: string) => value && /^\\d{4}-\\d{2}-\\d{2}/.test(value) ? value.slice(0, 10) : null
 
 /**
  * Rule-based checks over the submitted evidence ledger and rights-cleared sale rows.
@@ -50,7 +49,7 @@ export function buildDeterministicModuleReport(input: {
   const { records, sales } = input
   const textOf = (r: ModuleEvidence) => [r.claim, r.sourceName, r.sourceUrl].join(' ')
   const ids = (pattern: RegExp) => records.filter(r => pattern.test(textOf(r))).map(r => r.id)
-  const identityIds = ids(/\\b(vin|chassis|serial|reference number|build number|engine number)\\b/i)
+  const identityIds = ids(/\b(vin|chassis|serial|reference number|build number|engine number)\b/i)
   const factoryIds = ids(/factory|manufacturer|build sheet|production record|certificate/i)
   const provenanceIds = ids(/owner|ownership|provenance|delivered to|consigned by/i)
   const saleIds = ids(/auction|sold for|sale price|hammer price|realised|realized|completed sale|transaction/i)
@@ -58,8 +57,8 @@ export function buildDeterministicModuleReport(input: {
   const legalIds = ids(/title|registration|import|export|customs/i)
   const allDisputed = records.filter(r => r.status === 'disputed')
   const identifiers = records.flatMap(r => {
-    const matches = textOf(r).match(/\\b[A-HJ-NPR-Z0-9]{17}\\b|\\b\\d{1,3}\\s*\\/\\s*\\d{1,3}\\b/gi) ?? []
-    return matches.map(v => v.replace(/\\s+/g, ''))
+    const matches = textOf(r).match(/\b[A-HJ-NPR-Z0-9]{17}\b|\b\d{1,3}\s*\/\s*\d{1,3}\b/gi) ?? []
+    return matches.map(v => v.replace(/\s+/g, ''))
   })
   const uniqueIdentifiers = unique(identifiers)
   const gaps = [
@@ -97,7 +96,7 @@ export function buildDeterministicModuleReport(input: {
       unknown_asset_hypotheses: make('Unknown Asset Hypothesis Generator', uniqueIdentifiers.length > 1 ? 'ACTIONABLE' : 'LIMITED',
         uniqueIdentifiers.length > 1 ? [`The ledger contains ${uniqueIdentifiers.length} distinct identifier-like strings that may need identity reconciliation.`] : ['The ledger does not contain multiple distinct identifier-like strings for hypothesis ranking.'],
         ['Check each candidate identifier against the manufacturer or registry.', 'Keep VIN/chassis, production sequence and auction lot numbers as separate identifier types.', 'Write each explanation as a hypothesis and state what would falsify it.'],
-        records.filter(r => /\\b(vin|chassis|serial|build number)\\b/i.test(textOf(r))).map(r => r.id),
+        records.filter(r => /\b(vin|chassis|serial|build number)\b/i.test(textOf(r))).map(r => r.id),
         ['Identifier-like text is not validated against an authoritative registry.', 'No identity hypothesis is promoted to fact.']),
       acquisition_intelligence: make('Acquisition Intelligence', 'ACTIONABLE',
         [`Buyer diligence coverage: ${[identityIds, factoryIds, provenanceIds, conditionIds, legalIds].filter(x => x.length).length}/5 key topic groups have at least one keyword-matched submitted record.`],
