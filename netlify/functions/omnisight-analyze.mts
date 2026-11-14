@@ -202,6 +202,41 @@ function expectedEvidenceChecklist(assetName: string) {
   }
 }
 
+type EvidenceCoverageItem = {
+  key: string
+  label: string
+  status: 'PRESENT_IN_SUBMITTED_RECORDS' | 'NOT_PRESENT_IN_SUBMITTED_RECORDS'
+  record_ids: string[]
+  note: string
+}
+
+function buildEvidenceCoverage(records: Array<{ id: string; claim: string; sourceName: string; sourceUrl: string }>, assetClass: string): EvidenceCoverageItem[] {
+  const categories = [
+    { key: 'identity', label: 'Exact identity / serial / VIN', pattern: /\\b(vin|chassis|serial|reference number|build number|frame number|engine number|object number)\\b/i },
+    { key: 'factory', label: 'Factory / maker / production records', pattern: /factory|manufacturer|maker|build sheet|production record|certificate of origin|certificate of authenticity/i },
+    { key: 'provenance', label: 'Ownership / provenance timeline', pattern: /owner|ownership|provenance|previously owned|delivered to|consigned by|collection of/i },
+    { key: 'transactions', label: 'Auction / completed sale records', pattern: /auction|sold for|sale price|hammer price|realised|realized|completed sale|transaction/i },
+    { key: 'condition', label: 'Condition / service / restoration', pattern: /condition|service history|maintenance|restoration|repair|inspection|conservation/i },
+    { key: 'legal', label: 'Title / registration / import-export', pattern: /title|registration|registered|import|export|customs|ownership certificate/i },
+    { key: 'history', label: 'Competition / exhibition / event history', pattern: /competition|race|racing|exhibition|museum|event|championship|publication history/i },
+  ]
+  const applicable = assetClass === 'general_or_unclassified'
+    ? categories.filter(item => ['identity', 'factory', 'provenance', 'transactions', 'condition', 'legal'].includes(item.key))
+    : categories
+  return applicable.map(category => {
+    const matched = records.filter(record => category.pattern.test([record.claim, record.sourceName, record.sourceUrl].join(' ')))
+    return {
+      key: category.key,
+      label: category.label,
+      status: matched.length > 0 ? 'PRESENT_IN_SUBMITTED_RECORDS' : 'NOT_PRESENT_IN_SUBMITTED_RECORDS',
+      record_ids: matched.map(record => record.id),
+      note: matched.length > 0
+        ? 'At least one submitted evidence record matched this topic. Its truth and source quality still require review.'
+        : 'No submitted evidence record matched this topic. This does not mean the record does not exist elsewhere.',
+    }
+  })
+}
+
 function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }> } {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
@@ -453,6 +488,7 @@ export default async (request: Request) => {
     return json({
       analysis: guarded.analysis,
       expected_evidence_checklist: expectedChecklist,
+      submitted_evidence_coverage: buildEvidenceCoverage(records, expectedChecklist.asset_class),
       citations: extracted.citations,
       verdict_guard: {
         applied: guarded.applied,
