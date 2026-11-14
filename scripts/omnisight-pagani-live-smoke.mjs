@@ -42,6 +42,7 @@ const checks = [
   ['Pagani chassis/VIN and production serial are separate', payload.identity_identifiers?.some(x => x.identifier_type === 'vin_or_chassis' && x.value === fixture.target_identity.vin_or_chassis) && payload.identity_identifiers?.some(x => x.identifier_type === 'production_serial' && x.value === fixture.target_identity.production_serial)],
   ['source lineage report returned', Array.isArray(payload.source_lineage?.records)],
   ['negative-space audit returned', Array.isArray(payload.negative_space_audit?.gaps)],
+  ['search action trace returned', Array.isArray(payload.negative_space_audit?.search_trace)],
   ['market summary returned', Array.isArray(payload.market_summary?.currency_groups)],
   ['private analysis persisted', Boolean(payload.persistence?.analysisId)],
   ['usage quota returned', Number.isFinite(payload.usage?.used) && Number.isFinite(payload.usage?.limit)],
