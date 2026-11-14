@@ -57,6 +57,18 @@ export async function authenticateOmnisightUser(db: OmnisightDb, authorization: 
   return data.user
 }
 
+export async function consumeOmnisightRateLimit(db: OmnisightDb, userId: string) {
+  const { data, error } = await db.rpc('omnisight_consume_rate_limit', {
+    p_user_id: userId,
+    p_limit: 3,
+    p_window_seconds: 60,
+  })
+  if (error || !Array.isArray(data) || !data[0]) {
+    throw new Error('OMNISIGHT_RATE_LIMIT_CHECK_FAILED')
+  }
+  return data[0] as { allowed: boolean; used: number; resets_at: string }
+}
+
 export async function consumeOmnisightCredit(db: OmnisightDb, userId: string) {
   const { data, error } = await db.rpc('omnisight_consume_monthly_credit', {
     p_user_id: userId,
