@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
 import type { AuctionLot } from '../types'
@@ -78,6 +80,10 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
     try {
@@ -86,6 +92,23 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
       setError('This browser could not save the evidence records.')
     }
   }, [records])
+
+  useEffect(() => {
+    let active = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSession(data.session)
+    }).catch(() => {
+      if (active) setAuthMessage('Could not read the secure account session.')
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      if (nextSession) setAuthMessage('Secure account connected.')
+    })
+    return () => {
+      active = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
 
   const audit = useMemo(() => auditEvidence(records), [records])
 
@@ -97,13 +120,18 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
       return
     }
 
+    if (!session?.access_token) {
+      setAnalysisError('Sign in to your VALORAX account before starting private research.')
+      return
+    }
+
     const assetNameForAnalysis = records[0].assetName
     const assetRecords = records.filter(record => record.assetName === assetNameForAnalysis).slice(0, 12)
     setAnalysisLoading(true)
     try {
       const response = await fetch('/api/omnisight/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ assetName: assetNameForAnalysis, records: assetRecords }),
       })
       const payload = await response.json()
@@ -116,6 +144,30 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
     } finally {
       setAnalysisLoading(false)
     }
+  }
+
+  const sendMagicLink = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setAuthMessage('')
+    setAuthLoading(true)
+    try {
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email: authEmail.trim(),
+        options: { emailRedirectTo: window.location.origin },
+      })
+      if (authError) throw authError
+      setAuthMessage('Sign-in link sent. Open the email on this device to securely connect your account.')
+    } catch (caught) {
+      setAuthMessage(caught instanceof Error ? caught.message : 'Could not send sign-in link.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setSession(null)
+    setAuthMessage('Signed out.')
   }
 
   const importLotEvidence = (lot: AuctionLot) => {
@@ -213,10 +265,32 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
         <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold tracking-widest text-white">SERVER-SIDE INTELLIGENCE</h2>
-              <p className="mt-1 text-xs text-white/40">Research sources, compare claims and identify evidence conflicts</p>
+              <h2 className="text-sm font-bold tracking-widest text-white">PRIVATE COLLECTOR ACCOUNT</h2>
+              <p className="mt-1 text-xs text-white/45">Research is private to your signed-in account and saved securely.</p>
             </div>
-            <button type="button" onClick={runAnalysis} disabled={analysisLoading || records.length === 0} className="rounded-md bg-gradient-to-r from-[#D4AF37] to-[#A98522] px-4 py-3 text-[10px] font-black tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40">
+            {session ? (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-emerald-200">{session.user.email || 'Authenticated account'}</span>
+                <button type="button" onClick={signOut} className="rounded border border-white/15 px-3 py-2 text-[10px] text-white/70 hover:border-[#D4AF37]/50">SIGN OUT</button>
+              </div>
+            ) : (
+              <form onSubmit={sendMagicLink} className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <input type="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="Your email address" className="min-w-0 rounded border border-white/15 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-64" />
+                <button type="submit" disabled={authLoading} className="rounded bg-[#D4AF37] px-4 py-2 text-[10px] font-black tracking-widest text-black disabled:opacity-50">{authLoading ? 'SENDING...' : 'SEND SECURE LINK'}</button>
+              </form>
+            )}
+          </div>
+          {authMessage && <p role="status" className="mt-3 text-xs text-amber-200/80">{authMessage}</p>}
+          {!session && <p className="mt-2 text-[10px] leading-relaxed text-white/35">A one-time sign-in link will be sent by Supabase Auth. Research is unavailable until the link is confirmed.</p>}
+        </section>
+
+        <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold tracking-widest text-white">SERVER-SIDE INTELLIGENCE</h2>
+              <p className="mt-1 text-xs text-white/40">Research sources, compare claims and identify evidence conflicts · 10 analyses/month</p>
+            </div>
+            <button type="button" onClick={runAnalysis} disabled={analysisLoading || records.length === 0 || !session} className="rounded-md bg-gradient-to-r from-[#D4AF37] to-[#A98522] px-4 py-3 text-[10px] font-black tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40">
               {analysisLoading ? 'RESEARCHING...' : 'ANALYZE LATEST ASSET'}
             </button>
           </div>
