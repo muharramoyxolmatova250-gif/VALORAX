@@ -3,10 +3,12 @@ import type { FormEvent } from 'react'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
 import type { AuctionLot } from '../types'
+import { ADVANCED_ANALYSIS_FUNCTIONS, INTELLIGENCE_MODULES, type IntelligenceFinding } from '../omnisight/intelligence'
 
 const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
 
 type AnalysisResponse = {
+  analysis: {
   analysis: {
     verdict: 'GOOD' | 'BAD' | 'UNCERTAIN'
     confidence: number
@@ -15,6 +17,12 @@ type AnalysisResponse = {
     source_assessments: Array<{ source: string; finding: string; reliability: 'strong' | 'medium' | 'weak' | 'unknown' }>
     unknowns: string[]
     next_checks: string[]
+    intelligence: Record<string, IntelligenceFinding>
+    service_layers: {
+      global_asset_discovery: { summary: string; priorities: string[]; limitations: string[] }
+      private_collector_intelligence: { summary: string; priorities: string[]; limitations: string[] }
+    }
+    advanced_analysis: Record<string, IntelligenceFinding>
   }
   citations: Array<{ title: string; url: string }>
   checkedAt: string
@@ -221,6 +229,38 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
               )}
               {analysisResult.analysis.unknowns.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-amber-200">UNKNOWNS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.unknowns.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
               {analysisResult.analysis.next_checks.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">NEXT CHECKS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.next_checks.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+              <section className="space-y-4 border-t border-white/10 pt-4">
+                <div>
+                  <h3 className="mb-3 text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">8 INTELLIGENCE MODULES</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {INTELLIGENCE_MODULES.map(module => {
+                      const finding = analysisResult.analysis.intelligence[module.key]
+                      return <FindingCard key={module.key} title={module.name} finding={finding} />
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="mb-3 text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">2 SERVICE LAYERS</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {Object.entries(analysisResult.analysis.service_layers).map(([key, layer]) => (
+                      <div key={key} className="rounded-lg border border-[#D4AF37]/15 bg-black/20 p-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-white">{key.replaceAll('_', ' ')}</h4>
+                        <p className="mt-2 text-xs leading-relaxed text-white/65">{layer.summary}</p>
+                        <MiniList title="PRIORITIES" items={layer.priorities} />
+                        <MiniList title="LIMITATIONS" items={layer.limitations} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="mb-3 text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">7 ADVANCED ANALYSIS FUNCTIONS</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {ADVANCED_ANALYSIS_FUNCTIONS.map(module => (
+                      <FindingCard key={module.key} title={module.name} finding={analysisResult.analysis.advanced_analysis[module.key]} />
+                    ))}
+                  </div>
+                </div>
+              </section>
               {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
               <p className="border-t border-white/10 pt-3 text-[10px] leading-relaxed text-white/30">{analysisResult.disclaimer}</p>
             </div>
@@ -348,4 +388,33 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
       <input value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-3 text-sm text-white outline-none transition focus:border-[#D4AF37]/60" />
     </div>
   )
+}
+
+function FindingCard({ title, finding }: { title: string; finding: IntelligenceFinding }) {
+  const statusClass = finding.status === 'SUPPORTED'
+    ? 'border-emerald-400/30 text-emerald-300'
+    : finding.status === 'CONFLICT'
+      ? 'border-red-400/30 text-red-300'
+      : finding.status === 'NOT_FOUND'
+        ? 'border-amber-300/30 text-amber-200'
+        : 'border-white/20 text-white/60'
+  return (
+    <article className="rounded-lg border border-white/10 bg-black/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-xs font-bold text-white">{title}</h4>
+        <span className={`rounded border px-2 py-1 text-[9px] font-bold tracking-wider ${statusClass}`}>{finding.status}</span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-white/70">{finding.summary}</p>
+      <p className="mt-2 text-[10px] text-white/40">Confidence: {Math.round(finding.confidence * 100)}%</p>
+      <MiniList title="FINDINGS" items={finding.findings} />
+      <MiniList title="LIMITATIONS" items={finding.limitations} />
+      <MiniList title="NEXT ACTIONS" items={finding.next_actions} />
+      {finding.evidence_refs.length > 0 && <ul className="mt-2 space-y-1">{finding.evidence_refs.map((url, index) => <li key={index}><a href={url} target="_blank" rel="noreferrer" className="break-all text-[10px] text-[#D4AF37] hover:underline">Evidence reference {index + 1}</a></li>)}</ul>}
+    </article>
+  )
+}
+
+function MiniList({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null
+  return <div className="mt-2"><h5 className="text-[9px] font-bold tracking-widest text-white/35">{title}</h5><ul className="mt-1 list-disc space-y-1 pl-4 text-[10px] leading-relaxed text-white/55">{items.map((item, index) => <li key={index}>{item}</li>)}</ul></div>
 }
