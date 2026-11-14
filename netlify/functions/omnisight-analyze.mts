@@ -234,10 +234,15 @@ function buildEvidenceCoverage(records: Array<{ id: string; claim: string; sourc
   })
 }
 
-function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }> } {
+function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }>; searchQueries: string[] } {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
+  const searchQueries: string[] = []
   for (const item of payload?.output ?? []) {
+    if (item.type === 'web_search_call' && typeof item.action?.query === 'string') {
+      searchQueries.push(item.action.query)
+      continue
+    }
     if (item.type !== 'message') continue
     for (const part of item.content ?? []) {
       if (part.type === 'output_text' && typeof part.text === 'string') {
@@ -261,7 +266,7 @@ function extractOutputText(payload: any): { text: string; citations: Array<{ tit
     }
   }
   const unique = [...new Map(citations.map(item => [item.url, item])).values()]
-  return { text: chunks.join('\n'), citations: unique }
+  return { text: chunks.join('\n'), citations: unique, searchQueries: [...new Set(searchQueries)] }
 }
 
 export default async (request: Request) => {
@@ -559,7 +564,7 @@ export default async (request: Request) => {
     }
 
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
-    const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations)
+    const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries)
     const marketSummary = summarizeComparableSales(marketData.records)
 
     return json({
