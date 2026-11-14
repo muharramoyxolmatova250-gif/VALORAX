@@ -315,6 +315,8 @@ export default async (request: Request) => {
     recordedAt: cleanText(record.createdAt, 40),
   }))
 
+  const expectedChecklist = expectedEvidenceChecklist(assetName)
+
   const prompt = [
     'You are VALORAX OMNISIGHT, an independent asset evidence analyst.',
     'Use web search to research the asset and check the submitted claims against independent public sources.',
@@ -359,6 +361,9 @@ export default async (request: Request) => {
     '',
     'ASSET:',
     assetName,
+    '',
+    'EXPECTED EVIDENCE CHECKLIST (research scope, not proof that every record exists):',
+    JSON.stringify(expectedChecklist),
     '',
     'SUBMITTED EVIDENCE (JSON):',
     JSON.stringify(records),
@@ -457,7 +462,7 @@ export default async (request: Request) => {
 
     return json({
       analysis: guarded.analysis,
-      expected_evidence_checklist: expectedEvidenceChecklist(assetName),
+      expected_evidence_checklist: expectedChecklist,
       citations: extracted.citations,
       verdict_guard: {
         applied: guarded.applied,
