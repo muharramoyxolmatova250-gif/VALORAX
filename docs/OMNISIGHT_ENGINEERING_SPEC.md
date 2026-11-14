@@ -60,13 +60,15 @@ These are currently structured analysis layers, not separate services, agents or
 
 Migration: `supabase/migrations/202611140001_omnisight_intelligence.sql`.
 
-- Per-user assets, submitted evidence and analysis reports are stored with owner IDs and row-level security.
-- Entity graph stores assets, source domains and explicitly extracted identifiers. VIN/chassis and factory production serial are separate entity types; relationships are candidate links until human review.
+- Shared `omnisight_global_assets` indexes public asset names, while owner-scoped `omnisight_assets`, submitted evidence and analysis reports remain private under row-level security.
+- `omnisight_global_sources` and `omnisight_global_asset_sources` create a shared public asset-to-source graph from URLs returned by web search. The edge state is `search_returned`, not verified; citation presence does not prove claim support.
+- The private per-user entity graph stores assets, source domains and explicitly extracted identifiers. VIN/chassis and factory production serial are separate entity types; relationships are candidate links until human review.
+- Exact global asset keys use one unambiguous VIN when the submitted records agree on exactly one. If records contain zero or multiple distinct VINs, the system falls back to a model-level key and marks identity resolution as unresolved/ambiguous. This avoids merging two chassis merely because they share a model name.
 - Curated auction sales have explicit sold/unsold/withdrawn and candidate/verified/rejected states. Signed-in users can read verified rows; only the server service role should curate them.
 - Monthly quota is enforced atomically by a database function. Current limit: 10 analysis attempts per user per calendar month. Failed provider calls consume an attempt to avoid repeated unmetered retries.
 - Direct user writes are not granted by the migration; the server writes with the service role after authenticating the user's JWT.
 
-The migration must be applied manually in the Supabase SQL Editor before enabling the server endpoint. It has not been applied to the user's Supabase project from this repository workflow.
+The migration seeds two RM Sotheby's Huayra R sold-result catalogue entries and creates a shared public asset/source index. It must be applied manually in the Supabase SQL Editor before enabling the server endpoint. It has not been applied to the user's Supabase project from this repository workflow.
 
 ## Authentication and required environment
 
@@ -112,7 +114,7 @@ Failure of either gate downgrades the verdict to `UNCERTAIN`. These checks are c
 - Draft evidence records remain in the browser until a successful authenticated analysis persists them. The server then stores a durable per-user copy; cross-device draft synchronisation is not yet implemented.
 - The in-memory IP rate limit is per function instance and is not a durable global quota. The new database monthly quota is durable per user, but production still needs stronger distributed abuse protection, payment/plan entitlements and account-level monitoring.
 - The endpoint requires the browser Supabase URL/anon key and server-side `OMNISIGHT_ENABLED`, `OPENAI_API_KEY`, `OMNISIGHT_MODEL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Never expose server secrets with a `VITE_` prefix.
-- The Pagani Huayra R validation case and real-source fixture are documented in `docs/OMNISIGHT_PAGANI_VALIDATION.md` and `tests/fixtures/pagani-huayra-r.json`. The OpenAI live run still requires the user's Netlify and Supabase secrets and a configured deployment. The SQL migration has not yet been applied to the live Supabase project.
+- The Pagani Huayra R validation case and real-source fixture are documented in `docs/OMNISIGHT_PAGANI_VALIDATION.md` and `tests/fixtures/pagani-huayra-r.json`; regression tests verify the VIN/serial distinction and ensure the Paris comparison chassis is not merged into the target. The OpenAI live run still requires the user's Netlify and Supabase secrets and a configured deployment. The SQL migration has not yet been applied to the live Supabase project.
 
 ## Quality checks
 
