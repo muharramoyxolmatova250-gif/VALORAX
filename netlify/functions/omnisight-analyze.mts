@@ -256,10 +256,17 @@ function extractOutputText(payload: any): { text: string; citations: Array<{ tit
         chunks.push(part.text)
         for (const annotation of part.annotations ?? []) {
           if (annotation.type === 'url_citation' && typeof annotation.url === 'string') {
-            citations.push({
-              title: typeof annotation.title === 'string' ? annotation.title : annotation.url,
-              url: annotation.url,
-            })
+            try {
+              const citationUrl = new URL(annotation.url)
+              if (citationUrl.protocol === 'http:' || citationUrl.protocol === 'https:') {
+                citations.push({
+                  title: typeof annotation.title === 'string' ? annotation.title : annotation.url,
+                  url: citationUrl.href,
+                })
+              }
+            } catch {
+              // Ignore malformed or non-web citation references.
+            }
           }
         }
       }
