@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
+import type { AuctionLot } from '../types'
 
 const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
 
 interface Props {
   open: boolean
   onClose: () => void
+  lots: AuctionLot[]
 }
 
 const statusLabels: Record<EvidenceStatus, string> = {
@@ -18,7 +20,7 @@ const statusLabels: Record<EvidenceStatus, string> = {
   unknown: 'Unknown',
 }
 
-export default function OmniSightPanel({ open, onClose }: Props) {
+export default function OmniSightPanel({ open, onClose, lots }: Props) {
   const [records, setRecords] = useState<EvidenceRecord[]>(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY)
@@ -43,6 +45,26 @@ export default function OmniSightPanel({ open, onClose }: Props) {
   }, [records])
 
   const audit = useMemo(() => auditEvidence(records), [records])
+
+  const importLotEvidence = (lot: AuctionLot) => {
+    const record: EvidenceRecord = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : String(Date.now()),
+      assetName: lot.title,
+      claim: [
+        lot.subtitle ? `Listing description: ${lot.subtitle}` : '',
+        `Displayed current bid: ${lot.currency || 'USD'} ${lot.currentBid.toLocaleString()}`,
+        `Displayed bid count: ${lot.bids}`,
+        'Imported from the listing feed. These details are source-reported and have not been independently verified.',
+      ].filter(Boolean).join(' | '),
+      sourceName: lot.source || lot.creator || 'External auction source',
+      sourceUrl: lot.sourceUrl || '',
+      status: 'source_observed',
+      createdAt: new Date().toISOString(),
+    }
+    setRecords(current => [record, ...current])
+  }
 
   if (!open) return null
 
@@ -115,6 +137,33 @@ export default function OmniSightPanel({ open, onClose }: Props) {
             </div>
           ))}
         </div>
+
+        <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold tracking-widest text-white">LIVE SOURCE FEED</h2>
+              <p className="mt-1 text-xs text-white/40">Import a currently loaded VALORAX listing into the evidence ledger</p>
+            </div>
+            <span className="text-[10px] text-white/40">{lots.length} LOTS</span>
+          </div>
+          {lots.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-white/10 p-5 text-center text-xs text-white/40">No auction listings are currently loaded.</p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {lots.slice(0, 8).map(lot => (
+                <div key={lot.id} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-white">{lot.title}</p>
+                    <p className="mt-1 truncate text-[10px] text-white/40">{lot.source || lot.creator || 'Source not provided'}</p>
+                  </div>
+                  <button type="button" onClick={() => importLotEvidence(lot)} className="shrink-0 rounded border border-[#D4AF37]/35 px-3 py-2 text-[9px] font-bold tracking-wider text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black">
+                    ADD EVIDENCE
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
           <section className="rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
