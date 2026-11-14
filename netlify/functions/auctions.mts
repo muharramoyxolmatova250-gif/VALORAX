@@ -17,9 +17,10 @@ export default async () => {
     })
     const { data, error } = await db
       .from('omnisight_discovered_lots')
-      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status')
+      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status,last_seen_at')
       .in('listing_status', ['active', 'upcoming'])
       .gte('published_value_usd', MIN_VALUE_USD)
+      .gte('last_seen_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
       .order('auction_ends_at', { ascending: true })
       .limit(100)
 
@@ -37,8 +38,10 @@ export default async () => {
       const imageRightsCleared = ['licensed', 'permission_granted'].includes(lot.image_usage_status)
       const image = imageRightsCleared && typeof lot.hero_image_url === 'string' ? lot.hero_image_url : ''
       const imageSourceUrl = Array.isArray(lot.image_urls) && typeof lot.image_urls[0] === 'string' ? lot.image_urls[0] : ''
-      if (!Number.isFinite(value) || value < MIN_VALUE_USD || !Number.isFinite(endAt) || endAt <= now || !sourceUrl) return []
-      const status = Number.isFinite(startAt) && startAt > now ? 'UPCOMING' : 'LIVE'
+      if (!Number.isFinite(value) || value < MIN_VALUE_USD || !sourceUrl) return []
+      if (Number.isFinite(endAt) && endAt <= now) return []
+      if (lot.listing_status === 'upcoming' && (!Number.isFinite(startAt) || startAt <= now)) return []
+      const status = lot.listing_status === 'upcoming' ? 'UPCOMING' : 'LIVE'
       const categoryMap: Record<string, string> = {
         automotive: 'Cars',
         watch: 'Watches',
@@ -58,7 +61,7 @@ export default async () => {
         currentBid: value,
         reserve: value,
         escrow: 0,
-        secondsLeft: Math.max(0, Math.floor((endAt - now) / 1000)),
+        secondsLeft: Number.isFinite(endAt) ? Math.max(0, Math.floor((endAt - now) / 1000)) : 0,
         bids: 0,
         verified: lot.verification_status === 'human_reviewed',
         creator: lot.auction_house || 'External auction',
