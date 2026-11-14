@@ -287,7 +287,7 @@ export default async (request: Request) => {
   try {
     const rawBody = await request.text()
     const validation = validateResearchRequest(rawBody)
-    if (!validation.ok) return json({ error: validation.error }, validation.status)
+    if (validation.ok === false) return json({ error: validation.error }, validation.status)
     validated = validation.value
   } catch (error) {
     console.error('OMNISIGHT request validation failed:', error instanceof Error ? error.message : 'unknown')
