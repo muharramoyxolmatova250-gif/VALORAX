@@ -247,6 +247,7 @@ function extractOutputText(payload: any): {
   citations: Array<{ title: string; url: string }>
   searchQueries: string[]
   searchTrace: WebSearchTraceItem[]
+  providerUsage: { input_tokens: number; output_tokens: number; total_tokens: number } | null
 } {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
@@ -311,7 +312,18 @@ function extractOutputText(payload: any): {
   }
   const unique = [...new Map(citations.map(item => [item.url, item])).values()]
   const searchQueries = [...new Set(searchTrace.flatMap(item => item.queries))]
-  return { text: chunks.join('\n'), citations: unique, searchQueries, searchTrace }
+  const usage = payload?.usage
+  const providerUsage = usage &&
+    Number.isFinite(usage.input_tokens) &&
+    Number.isFinite(usage.output_tokens) &&
+    Number.isFinite(usage.total_tokens)
+    ? {
+        input_tokens: Math.max(0, Math.floor(usage.input_tokens)),
+        output_tokens: Math.max(0, Math.floor(usage.output_tokens)),
+        total_tokens: Math.max(0, Math.floor(usage.total_tokens)),
+      }
+    : null
+  return { text: chunks.join('\n'), citations: unique, searchQueries, searchTrace, providerUsage }
 }
 
 export default async (request: Request) => {
@@ -599,7 +611,7 @@ export default async (request: Request) => {
       persistence = await persistOmnisightResearch(db, user.id, {
         assetName,
         records,
-        analysis: guarded.analysis,
+        analysis: analysisWithUsage,
         citations: extracted.citations,
         model,
       })
@@ -611,9 +623,14 @@ export default async (request: Request) => {
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
+    const analysisWithUsage = {
+      ...guarded.analysis,
+      provider_usage: extracted.providerUsage,
+      web_search_call_count: extracted.searchTrace.length,
+    }
 
     return json({
-      analysis: guarded.analysis,
+      analysis: analysisWithUsage,
       expected_evidence_checklist: expectedChecklist,
       submitted_evidence_coverage: submittedCoverage,
       negative_space_audit: negativeSpaceAudit,
