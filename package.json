@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "test:omnisight": "node --experimental-strip-types --test tests/omnisight-intelligence.test.mts"
   },
   "dependencies": {
     "@netlify/functions": "^6.0.0",
