@@ -47,7 +47,7 @@ export function buildDeterministicModuleReport(input: {
   records: ModuleEvidence[]
   sales: ModuleSale[]
 }): DeterministicModuleReport {
-  const { assetName, records, sales } = input
+  const { records, sales } = input
   const textOf = (r: ModuleEvidence) => [r.claim, r.sourceName, r.sourceUrl].join(' ')
   const ids = (pattern: RegExp) => records.filter(r => pattern.test(textOf(r))).map(r => r.id)
   const identityIds = ids(/\\b(vin|chassis|serial|reference number|build number|engine number)\\b/i)
@@ -57,13 +57,11 @@ export function buildDeterministicModuleReport(input: {
   const conditionIds = ids(/condition|service|maintenance|restoration|repair|inspection/i)
   const legalIds = ids(/title|registration|import|export|customs/i)
   const allDisputed = records.filter(r => r.status === 'disputed')
-  const sellerOnly = records.filter(r => r.status === 'seller_claim')
   const identifiers = records.flatMap(r => {
     const matches = textOf(r).match(/\\b[A-HJ-NPR-Z0-9]{17}\\b|\\b\\d{1,3}\\s*\\/\\s*\\d{1,3}\\b/gi) ?? []
     return matches.map(v => v.replace(/\\s+/g, ''))
   })
   const uniqueIdentifiers = unique(identifiers)
-  const dated = records.map(r => ({ id: r.id, date: dateOf(r.recordedAt) })).filter((r): r is { id: string; date: string } => Boolean(r.date)).sort((a,b) => a.date.localeCompare(b.date))
   const gaps = [
     ['exact identity', identityIds], ['factory/build', factoryIds], ['ownership/provenance', provenanceIds],
     ['completed transactions', saleIds], ['condition/service', conditionIds], ['legal/title', legalIds],
