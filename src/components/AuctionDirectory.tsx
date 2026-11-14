@@ -320,14 +320,27 @@ function LotCard({
             </span>
           </div>
 
-          <motion.span
-            whileHover={{ x: 2 }}
-            className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
-            style={{ color: GOLD }}
-          >
-            VIEW LOT
-            <ExternalLink size={9} />
-          </motion.span>
+          <div className="flex items-center gap-3">
+            {lot.sourceUrl && (
+              <a
+                href={lot.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                ORIGINAL SOURCE <ExternalLink size={9} />
+              </a>
+            )}
+            <motion.span
+              whileHover={{ x: 2 }}
+              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+              style={{ color: GOLD }}
+            >
+              VIEW LOT
+              <ExternalLink size={9} />
+            </motion.span>
+          </div>
         </div>
       </div>
     </motion.div>
