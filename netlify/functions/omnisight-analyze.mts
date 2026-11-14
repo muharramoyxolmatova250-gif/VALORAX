@@ -234,13 +234,57 @@ function buildEvidenceCoverage(records: Array<{ id: string; claim: string; sourc
   })
 }
 
-function extractOutputText(payload: any): { text: string; citations: Array<{ title: string; url: string }>; searchQueries: string[] } {
+type WebSearchTraceItem = {
+  action: 'search' | 'open_page' | 'find_in_page' | 'unknown'
+  queries: string[]
+  url: string | null
+  pattern: string | null
+  source_urls: string[]
+}
+
+function extractOutputText(payload: any): {
+  text: string
+  citations: Array<{ title: string; url: string }>
+  searchQueries: string[]
+  searchTrace: WebSearchTraceItem[]
+} {
   const chunks: string[] = []
   const citations: Array<{ title: string; url: string }> = []
-  const searchQueries: string[] = []
+  const searchTrace: WebSearchTraceItem[] = []
   for (const item of payload?.output ?? []) {
-    if (item.type === 'web_search_call' && typeof item.action?.query === 'string') {
-      searchQueries.push(item.action.query)
+    if (item.type === 'web_search_call') {
+      const action = item.action ?? {}
+      const actionType = action.type
+      const queries = Array.isArray(action.queries)
+        ? action.queries.filter((query: unknown): query is string => typeof query === 'string' && Boolean(query.trim()))
+        : typeof action.query === 'string' && action.query.trim() ? [action.query] : []
+      const sourceUrls = Array.isArray(action.sources)
+        ? action.sources.flatMap((source: any) => {
+            if (typeof source?.url !== 'string') return []
+            try {
+              const url = new URL(source.url)
+              return ['http:', 'https:'].includes(url.protocol) ? [url.href] : []
+            } catch {
+              return []
+            }
+          })
+        : []
+      let url: string | null = null
+      if (typeof action.url === 'string') {
+        try {
+          const parsed = new URL(action.url)
+          if (['http:', 'https:'].includes(parsed.protocol)) url = parsed.href
+        } catch {
+          // Ignore malformed tool trace URLs.
+        }
+      }
+      searchTrace.push({
+        action: actionType === 'search' || actionType === 'open_page' || actionType === 'find_in_page' ? actionType : 'unknown',
+        queries,
+        url,
+        pattern: typeof action.pattern === 'string' ? action.pattern : null,
+        source_urls: [...new Set(sourceUrls)],
+      })
       continue
     }
     if (item.type !== 'message') continue
@@ -266,7 +310,8 @@ function extractOutputText(payload: any): { text: string; citations: Array<{ tit
     }
   }
   const unique = [...new Map(citations.map(item => [item.url, item])).values()]
-  return { text: chunks.join('\n'), citations: unique, searchQueries: [...new Set(searchQueries)] }
+  const searchQueries = [...new Set(searchTrace.flatMap(item => item.queries))]
+  return { text: chunks.join('\n'), citations: unique, searchQueries, searchTrace }
 }
 
 export default async (request: Request) => {
@@ -564,7 +609,7 @@ export default async (request: Request) => {
     }
 
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
-    const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries)
+    const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
 
     return json({
