@@ -26,7 +26,7 @@ export function extractAssetIdentifiers(text: string): ExtractedAssetIdentifier[
   ]
   for (const pattern of serialPatterns) {
     for (const match of text.matchAll(pattern)) {
-      const value = match[1].replace(/\s+/g, '')
+      const value = match[2] ? `${match[1]}/${match[2]}` : match[1].replace(/\s+/g, '')
       found.set('production_serial:' + value, {
         identifier_type: 'production_serial',
         value,
