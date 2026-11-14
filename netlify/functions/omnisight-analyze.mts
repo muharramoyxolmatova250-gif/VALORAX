@@ -1,4 +1,5 @@
 import type { Config } from '@netlify/functions'
+import { buildDeterministicModuleReport } from './lib/module-engine.mjs'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
@@ -527,6 +528,7 @@ export default async (request: Request) => {
         assetName,
         records,
         analysis: analysisWithUsage,
+      deterministic_modules: deterministicModules,
         citations: extracted.citations,
         model,
       })
@@ -538,6 +540,7 @@ export default async (request: Request) => {
     const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
     const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations, extracted.searchQueries, extracted.searchTrace)
     const marketSummary = summarizeComparableSales(marketData.records)
+    const deterministicModules = buildDeterministicModuleReport({ assetName, records, sales: marketData.records })
 
     return json({
       analysis: analysisWithUsage,
