@@ -30,6 +30,22 @@ type AnalysisResponse = {
     expected_traces: string[]
     interpretation: string
   }
+  negative_space_audit: {
+    search_method: string
+    search_scope: string[]
+    searched_source_domains: string[]
+    expected_trace_count: number
+    submitted_trace_count: number
+    gaps: Array<{
+      key: string
+      label: string
+      state: 'NOT_PRESENT_IN_SUBMITTED_RECORDS'
+      significance: 'RESEARCH_GAP' | 'IDENTITY_CRITICAL' | 'DILIGENCE_CRITICAL'
+      why_it_matters: string
+      recommended_next_evidence: string
+    }>
+    limitations: string[]
+  }
   submitted_evidence_coverage: Array<{
     key: string
     label: string
@@ -494,6 +510,27 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                   ))}
                 </div>
                 {analysisResult.source_lineage.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
+              </section>
+              <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.025] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[10px] font-bold tracking-[0.18em] text-amber-200">NEGATIVE-SPACE / MISSING TRACE AUDIT</h3>
+                  <span className="text-[10px] text-white/45">{analysisResult.negative_space_audit.gaps.length} documentation gaps</span>
+                </div>
+                <p className="mt-2 text-xs text-white/60">{analysisResult.negative_space_audit.submitted_trace_count} of {analysisResult.negative_space_audit.expected_trace_count} expected topics appear in submitted records</p>
+                <div className="mt-3 space-y-2">
+                  {analysisResult.negative_space_audit.gaps.map(gap => (
+                    <div key={gap.key} className="rounded border border-white/10 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-white">{gap.label}</span>
+                        <span className={gap.significance === 'IDENTITY_CRITICAL' ? 'text-[10px] text-amber-200' : 'text-[10px] text-white/40'}>{gap.significance.replace(/_/g, ' ')}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-white/55">{gap.why_it_matters}</p>
+                      <p className="mt-1 text-[11px] text-white/75">Next evidence: {gap.recommended_next_evidence}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-[10px] text-white/45">Searched citation domains: {analysisResult.negative_space_audit.searched_source_domains.join(', ') || 'No citation domains returned'}</p>
+                {analysisResult.negative_space_audit.limitations.map(item => <p key={item} className="mt-2 text-[10px] leading-relaxed text-white/35">• {item}</p>)}
               </section>
               {analysisResult.citations.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">RESEARCH SOURCES</h3><ul className="space-y-1">{analysisResult.citations.map((item,index)=><li key={index}><a href={item.url} target="_blank" rel="noreferrer" className="text-xs text-[#D4AF37] hover:underline">{item.title}</a></li>)}</ul></div>}
               <p className="border-t border-white/10 pt-3 text-[10px] leading-relaxed text-white/30">{analysisResult.disclaimer}</p>
