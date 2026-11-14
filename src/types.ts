@@ -59,6 +59,12 @@ export interface AuctionLot {
 
   // Currency used by original auction
   currency?: string
+
+  // Source-published USD threshold value for premium catalogue eligibility
+  publishedValueUsd?: number
+
+  // Concise source-linked factual summary
+  summary?: string
 }
 
 export interface BidEntry {
