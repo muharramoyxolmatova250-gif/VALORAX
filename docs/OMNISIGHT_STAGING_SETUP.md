@@ -52,8 +52,8 @@ Do not set either worker flag to true until the source registry has an approved,
 ## Current limitations
 
 - Old Cars Data's live feed returns active listings, not a general upcoming feed. Upcoming lots from other asset classes require additional licensed providers.
-- The discovery worker imports one page (up to 100 records) per invocation and uses a durable page cursor. A production 500,000-record programme needs additional licensed sources, a scalable worker/queue and monitored throughput.
-- The scheduled AI worker processes one queued report per invocation and has a short execution timeout. It is a staging prototype, not yet a high-throughput AI fleet.
+- Both scheduled workers start at an hourly cadence. The discovery worker imports one page (up to 100 records) per invocation and uses a durable page cursor (about 720 provider requests/month if continuously published). A production 500,000-record programme needs additional licensed sources, a scalable worker/queue and monitored throughput.
+- The scheduled AI worker processes one queued report per hour and has a short execution timeout. This is a cost-controlled staging prototype, not yet a high-throughput AI fleet; processing 500,000 reports requires a separately budgeted worker fleet.
 - Image URLs are stored as references. Images are not embedded until image-specific rights are documented.
 - No live provider import or OpenAI per-lot run has been performed yet.
 
