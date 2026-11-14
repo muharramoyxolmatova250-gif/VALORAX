@@ -6,14 +6,17 @@
 
 ## Current request flow
 
-1. The browser stores the user's evidence ledger locally and submits records for one exact asset.
-2. The Netlify function validates method, same-origin browser requests, payload size, record count, asset consistency and HTTP(S) source URLs.
-3. The server builds an asset-class expected-evidence checklist and a deterministic coverage map of topics present or absent from the submitted ledger.
-4. The server sends untrusted submitted claims plus explicit evidence-first instructions to the OpenAI Responses API with web search and strict JSON output.
-5. Citation URLs are extracted from actual web-search annotations.
-6. The deterministic finding guard removes citation URLs that were not returned by search, clamps confidence, and downgrades unsupported module statuses.
-7. The verdict gate can downgrade GOOD or BAD to UNCERTAIN. It never upgrades a verdict.
-8. The browser renders source citations, expected evidence, submitted-ledger coverage, module findings and verdict-gate reasoning.
+1. The browser stores the draft evidence ledger locally and signs in using a Supabase Auth magic link.
+2. The browser sends the Supabase access token to the Netlify function. The server validates the token against Supabase Auth and rejects anonymous/unauthenticated requests.
+3. The Netlify function validates method, same-origin browser requests, payload size, record count, asset consistency and HTTP(S) source URLs.
+4. The server atomically consumes a per-user monthly research credit before calling the AI provider.
+5. The server builds an asset-class expected-evidence checklist and a deterministic coverage map of topics present or absent from the submitted ledger.
+6. The server sends untrusted submitted claims plus explicit evidence-first instructions to the OpenAI Responses API with web search and strict JSON output.
+7. Citation URLs are extracted from actual web-search annotations.
+8. The deterministic finding guard removes citation URLs that were not returned by search, clamps confidence, and downgrades unsupported module statuses.
+9. The verdict gate can downgrade GOOD or BAD to UNCERTAIN. It never upgrades a verdict.
+10. The server persists the asset, evidence, report, citation sources, typed identifier entities and candidate graph relationships in Supabase using a server-only service-role key.
+11. The browser renders source citations, expected evidence, submitted-ledger coverage, module findings, exact identifiers, usage quota and verdict-gate reasoning.
 
 ## Status semantics
 
@@ -53,6 +56,33 @@ These are currently structured analysis layers, not separate services, agents or
 - COUNTERFACTUAL HISTORY — clearly labelled hypothetical scenarios.
 - PRIVATE KNOWLEDGE DISCOVERY — connects scattered public records and labels leads for human verification.
 
+## Supabase data foundation
+
+Migration: `supabase/migrations/202611140001_omnisight_intelligence.sql`.
+
+- Per-user assets, submitted evidence and analysis reports are stored with owner IDs and row-level security.
+- Entity graph stores assets, source domains and explicitly extracted identifiers. VIN/chassis and factory production serial are separate entity types; relationships are candidate links until human review.
+- Curated auction sales have explicit sold/unsold/withdrawn and candidate/verified/rejected states. Signed-in users can read verified rows; only the server service role should curate them.
+- Monthly quota is enforced atomically by a database function. Current limit: 10 analysis attempts per user per calendar month. Failed provider calls consume an attempt to avoid repeated unmetered retries.
+- Direct user writes are not granted by the migration; the server writes with the service role after authenticating the user's JWT.
+
+The migration must be applied manually in the Supabase SQL Editor before enabling the server endpoint. It has not been applied to the user's Supabase project from this repository workflow.
+
+## Authentication and required environment
+
+Browser build variables:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Netlify server-only variables:
+- `OMNISIGHT_ENABLED=true`
+- `OPENAI_API_KEY=<server-side secret>`
+- `OMNISIGHT_MODEL=<model available to the connected API project>`
+- `SUPABASE_URL=<same Supabase project URL>`
+- `SUPABASE_SERVICE_ROLE_KEY=<server-only service role secret>`
+
+Never use a `VITE_` prefix for OpenAI or Supabase service-role secrets. Configure the Supabase Auth email template and allowed redirect URLs for the deployed VALORAX domain. Do not paste any secret into chat or commit it to GitHub.
+
 ## Deterministic verdict gates
 
 ### GOOD
@@ -79,10 +109,10 @@ Failure of either gate downgrades the verdict to `UNCERTAIN`. These checks are c
 - Submitted-evidence coverage is keyword-based and only covers the browser-submitted ledger.
 - Cross-asset discovery does not yet have a persistent, multi-asset entity graph or a licensed global asset corpus.
 - Valuation does not yet have a curated, normalized, independently verified comparable-sales database.
-- The evidence ledger is local to the browser, not a shared server database.
-- The in-memory IP rate limit is per function instance and is not a durable global quota. Production deployment needs stronger abuse protection and account-level usage limits.
-- The endpoint requires Netlify secrets `OMNISIGHT_ENABLED`, `OPENAI_API_KEY` and `OMNISIGHT_MODEL`. Never expose the API key with a `VITE_` prefix.
-- A live OpenAI request, live asset audit, production deployment and third-party source licensing review are still required before launch.
+- Draft evidence records remain in the browser until a successful authenticated analysis persists them. The server then stores a durable per-user copy; cross-device draft synchronisation is not yet implemented.
+- The in-memory IP rate limit is per function instance and is not a durable global quota. The new database monthly quota is durable per user, but production still needs stronger distributed abuse protection, payment/plan entitlements and account-level monitoring.
+- The endpoint requires the browser Supabase URL/anon key and server-side `OMNISIGHT_ENABLED`, `OPENAI_API_KEY`, `OMNISIGHT_MODEL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Never expose server secrets with a `VITE_` prefix.
+- The Pagani Huayra R validation case and real-source fixture are documented in `docs/OMNISIGHT_PAGANI_VALIDATION.md` and `tests/fixtures/pagani-huayra-r.json`. The OpenAI live run still requires the user's Netlify and Supabase secrets and a configured deployment. The SQL migration has not yet been applied to the live Supabase project.
 
 ## Quality checks
 
