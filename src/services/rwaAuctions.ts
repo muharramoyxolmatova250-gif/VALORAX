@@ -70,7 +70,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
   }
 
   const eligibleExternal = externalLots.filter(lot =>
-    (lot.status === 'LIVE' || lot.status === 'UPCOMING') &&
+    lot.status === 'LIVE' &&
     lot.currency === 'USD' &&
     Number(lot.publishedValueUsd) >= 500_000 &&
     Boolean(lot.sourceUrl)
