@@ -1,3 +1,37 @@
+## Production hardening work (feature branch)
+
+### Request boundary
+- Incoming JSON is validated before monthly AI credit is consumed.
+- Evidence record IDs must be unique; all records must refer to the same exact submitted asset name.
+- Record count, per-field length, aggregate text size and body bytes are bounded.
+- Source URLs must be HTTP(S), cannot contain embedded credentials, and reject local hostnames and IP-literal hosts. The server does not fetch user-supplied URLs directly.
+- Invalid evidence dates and unsupported statuses are rejected.
+- Persistent per-user rate limiting is combined with a bounded per-instance IP limiter.
+
+### Saved-graph cross-asset discovery
+- The server checks the authenticated user's saved graph for shared person, organisation, auction, document, event or identifier nodes linked to another saved asset.
+- Connections retain their stored candidate/verified review state; discovery does not promote candidates.
+- Shared marque, auction house or event references are leads only, not proof of common ownership or wrongdoing.
+- Search is limited to the user's own saved graph; it is not a global cross-customer database.
+
+### Module logic
+- Counterfactual Reasoning creates explicitly hypothetical, falsifiable scenarios from machine-comparable evidence conflicts.
+- Acquisition Intelligence reports evidence-topic coverage and stays LIMITED when fewer than three of five diligence groups are represented.
+- Valuation Intelligence reports sold-result count, range and median separately by currency. It remains descriptive, not an appraisal.
+- Evidence Conflict Engine preserves differing explicit values as unresolved candidates; it never chooses a winner automatically.
+
+### Deployment gate — not yet complete
+Before enabling production traffic, an authorised project owner must:
+1. Apply migrations `202611140001_omnisight_intelligence.sql` and `202611140002_omnisight_persistent_rate_limit.sql` in the intended Supabase project and verify tables, RLS policies and RPC functions.
+2. Configure Netlify variables `OMNISIGHT_ENABLED=true`, `OPENAI_API_KEY`, `OMNISIGHT_MODEL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the correct deploy context. Never expose the service-role key to the browser.
+3. Confirm the selected OpenAI model supports Responses API web search and strict JSON-schema output, and approve project billing/limits.
+4. Populate `omnisight_market_sales` only with records whose source verification and data-use rights have been reviewed. Seed rows are intentionally `review_required` and are not used by the cleared-sales query.
+5. Run `npm run omnisight:live-pagani` against a protected staging deployment, inspect saved evidence/analysis/graph records, and verify error handling and usage accounting.
+6. Complete security, privacy/retention, monitoring and human verdict-policy review before production.
+7. Obtain explicit approval before merging PR #3 or deploying.
+
+A passing build and automated test suite are necessary but do not prove that Supabase migrations are applied, secrets are configured, market-data licences are cleared, live provider access works, or production operations are ready.
+
 # OMNISIGHT engineering specification
 
 ## Product principle
