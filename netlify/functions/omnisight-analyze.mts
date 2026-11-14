@@ -97,7 +97,7 @@ function rateLimited(ip: string) {
  */
 function registrableHost(rawUrl: string): string | null {
   try {
-    const hostname = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '')
+    const hostname = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '')
     if (!hostname || !hostname.includes('.')) return null
     const labels = hostname.split('.')
     const multiPartSuffixes = new Set(['co.uk', 'org.uk', 'com.au', 'net.au', 'co.nz', 'com.br', 'co.jp'])
