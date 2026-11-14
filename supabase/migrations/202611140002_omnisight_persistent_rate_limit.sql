@@ -38,15 +38,15 @@ begin
     window_started_at = case
       when current_limit.window_started_at + make_interval(secs => p_window_seconds) <= v_now
         then v_now
-      else public.omnisight_rate_limits.window_started_at
+      else current_limit.window_started_at
     end,
     request_count = case
-      when public.omnisight_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= v_now
+      when current_limit.window_started_at + make_interval(secs => p_window_seconds) <= v_now
         then 1
       else current_limit.request_count + 1
     end,
     updated_at = v_now
-  returning public.omnisight_rate_limits.window_started_at, public.omnisight_rate_limits.request_count
+  returning current_limit.window_started_at, current_limit.request_count
   into v_started_at, v_count;
 
   return query select
