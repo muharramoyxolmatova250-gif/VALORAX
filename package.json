@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
-    "test:omnisight": "node --experimental-strip-types --test tests/omnisight-intelligence.test.mts tests/source-lineage.test.mts tests/graph-extract.test.mts tests/negative-space.test.mts tests/market-intelligence.test.mts"
+    "test:omnisight": "node --experimental-strip-types --test tests/omnisight-intelligence.test.mts tests/source-lineage.test.mts tests/graph-extract.test.mts tests/negative-space.test.mts tests/market-intelligence.test.mts",
+    "omnisight:live-pagani": "node scripts/omnisight-pagani-live-smoke.mjs"
   },
   "dependencies": {
     "@netlify/functions": "^6.0.0",
