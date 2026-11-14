@@ -431,7 +431,7 @@ export default function App() {
         </div>
       </main>
 
-      <OmniSightPanel open={omniSightOpen} onClose={() => setOmniSightOpen(false)} />
+      <OmniSightPanel open={omniSightOpen} onClose={() => setOmniSightOpen(false)} lots={lots} />
 
       {/* Footer Ticker */}
       <LiveTicker />
