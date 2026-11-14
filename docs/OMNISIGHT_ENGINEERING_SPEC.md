@@ -56,7 +56,7 @@ The server now adds a separate `deterministic_modules` report generated from the
 - Rarity: detects rarity/production language and recommends primary-source checks; it does not certify production or survival counts.
 - Valuation: describes only supplied rights-cleared completed-sale rows, separated by currency; it does not appraise or predict value.
 
-Regression coverage is in `tests/module-engine.test.mts`, included in `npm run test:omnisight`. These tests still need to pass in GitHub Actions before this change is treated as verified.
+Regression coverage is in `tests/module-engine.test.mts`, included in `npm run test:omnisight`. The CI run for the initial eight-module wiring passed. The deterministic conflict extractor additionally compares explicit VIN, production sequence, claimed production totals and stated build years, preserving differing values as unresolved conflict candidates. This is deliberately a narrow parser: it does not prove which source is correct or detect every contradiction. The UI displays these candidates with their record IDs and source domains.
 
 ## Two service layers
 
