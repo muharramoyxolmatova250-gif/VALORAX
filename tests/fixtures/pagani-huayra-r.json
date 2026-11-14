@@ -1,0 +1,43 @@
+{
+  "case_id": "pagani-huayra-r-rm-sothebys-lot-132",
+  "asset_name": "2022 Pagani Huayra R",
+  "target_identity": {
+    "vin_or_chassis": "ZA9H11WTYYSF76003",
+    "production_serial": "11/30"
+  },
+  "evidence_records": [
+    {
+      "id": "rm-132-2025",
+      "assetName": "2022 Pagani Huayra R",
+      "claim": "RM Sotheby's lot 132 catalogue identifies the 2022 Pagani Huayra R as Chassis No. ZA9H11WTYYSF76003 and Serial No. 11/30. The published result is CHF 2,367,500 Sold. The catalogue lists 470 kilometres at cataloguing.",
+      "sourceName": "RM Sotheby's — The Tailored for Speed Collection, lot 132",
+      "sourceUrl": "https://rmsothebys.com/auctions/id25/lots/r0042-2022-pagani-huayra-r/",
+      "status": "source_observed",
+      "createdAt": "2026-11-14T00:00:00.000Z"
+    },
+    {
+      "id": "pagani-official-huayra-r",
+      "assetName": "2022 Pagani Huayra R",
+      "claim": "Pagani's official Huayra R release states the model is limited to 30 examples and specifies the naturally aspirated V12-R at 850 HP, 750 Nm, 9000 rpm redline and 1050 kg dry weight. This source confirms model-level specifications, not the identity or condition of chassis ZA9H11WTYYSF76003.",
+      "sourceName": "Pagani Automobili — Official Huayra R release",
+      "sourceUrl": "https://www.pagani.com/huayra-r/",
+      "status": "source_observed",
+      "createdAt": "2026-11-14T00:00:00.000Z"
+    }
+  ],
+  "comparison_only": [
+    {
+      "sourceName": "RM Sotheby's — Paris 2025, lot 20",
+      "sourceUrl": "https://backoffice.rmsothebys.com/auctions/pa25/lots/r0020-2022-pagani-huayra-r/",
+      "claim": "A different Huayra R: chassis ZA9H11WTYYSF76005, production serial 5/30, published result EUR 3,042,500 Sold. Do not merge this chassis or sale into the target vehicle's provenance."
+    }
+  ],
+  "expected_invariants": [
+    "VIN/chassis identifier and production serial must be stored as different identifier types.",
+    "ZA9H11WTYYSF76003 must not be converted into production serial 3/30.",
+    "The RM Sotheby's lot 132 published result is CHF 2,367,500, not the higher simulator-inclusive media-centre number.",
+    "The official Pagani source confirms model specifications and production limit, not this exact chassis.",
+    "The Paris 2025 chassis 005 / serial 5/30 sale is a separate comparable, not target-asset provenance.",
+    "The final verdict must not authenticate the physical car or legal title. A cautious UNCERTAIN result is acceptable if evidence scope is insufficient."
+  ]
+}
