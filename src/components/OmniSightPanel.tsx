@@ -24,6 +24,11 @@ type AnalysisResponse = {
     }
     advanced_analysis: Record<string, IntelligenceFinding>
   }
+  expected_evidence_checklist: {
+    asset_class: string
+    expected_traces: string[]
+    interpretation: string
+  }
   citations: Array<{ title: string; url: string }>
   checkedAt: string
   model: string
@@ -229,6 +234,13 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
               )}
               {analysisResult.analysis.unknowns.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-amber-200">UNKNOWNS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.unknowns.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
               {analysisResult.analysis.next_checks.length > 0 && <div><h3 className="mb-2 text-[10px] font-bold tracking-widest text-white/65">NEXT CHECKS</h3><ul className="list-disc space-y-1 pl-5 text-xs text-white/60">{analysisResult.analysis.next_checks.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+              <section className="rounded-lg border border-amber-300/15 bg-amber-300/[0.035] p-4">
+                <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-200">EXPECTED EVIDENCE MAP · {analysisResult.expected_evidence_checklist.asset_class.replaceAll('_', ' ')}</h3>
+                <p className="mt-2 text-xs leading-relaxed text-white/55">{analysisResult.expected_evidence_checklist.interpretation}</p>
+                <ul className="mt-3 grid gap-2 text-xs text-white/70 md:grid-cols-2">
+                  {analysisResult.expected_evidence_checklist.expected_traces.map((item, index) => <li key={index} className="flex gap-2"><span className="text-amber-200">•</span>{item}</li>)}
+                </ul>
+              </section>
               <section className="space-y-4 border-t border-white/10 pt-4">
                 <div>
                   <h3 className="mb-3 text-[10px] font-bold tracking-[0.2em] text-[#D4AF37]">8 INTELLIGENCE MODULES</h3>
