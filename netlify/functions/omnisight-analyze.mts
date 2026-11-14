@@ -2,7 +2,7 @@ import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
-import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
   id: string
@@ -302,6 +302,20 @@ export default async (request: Request) => {
     return json({ error: 'Secure OMNISIGHT account service is not configured.' }, 503)
   }
   if (!user) return json({ error: 'Sign in with your VALORAX account to run private research.' }, 401)
+
+  let userRate
+  try {
+    userRate = await consumeOmnisightRateLimit(db, user.id)
+  } catch (error) {
+    console.error('OMNISIGHT persistent rate limit failed:', error instanceof Error ? error.message : 'unknown')
+    return json({ error: 'Could not verify the research rate limit.' }, 503)
+  }
+  if (!userRate.allowed) {
+    return json({
+      error: 'Rate limit reached. Please wait before starting another research request.',
+      rate_limit: { used: userRate.used, limit: 3, resets_at: userRate.resets_at },
+    }, 429)
+  }
 
   const apiKey = process.env.OPENAI_API_KEY
   const model = process.env.OMNISIGHT_MODEL
