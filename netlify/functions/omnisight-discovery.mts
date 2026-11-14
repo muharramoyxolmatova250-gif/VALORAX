@@ -134,9 +134,10 @@ export default async () => {
         value_checked_at: new Date().toISOString(),
         auction_starts_at: startAt?.toISOString() ?? null,
         auction_ends_at: endAt.toISOString(),
-        hero_image_url: imageUrl,
+        // Keep the original image URL as a source reference. Do not hotlink/embed it until image-specific rights are cleared.
+        hero_image_url: null,
         image_urls: imageUrl ? [imageUrl] : [],
-        image_usage_status: 'link_only',
+        image_usage_status: 'unknown',
         short_factual_summary: typeof item?.description === 'string' ? item.description.slice(0, 1200) : null,
         source_title: title,
         verification_status: 'source_checked',
