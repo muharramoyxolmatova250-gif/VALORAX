@@ -212,7 +212,7 @@ type EvidenceCoverageItem = {
 
 function buildEvidenceCoverage(records: Array<{ id: string; claim: string; sourceName: string; sourceUrl: string }>, assetClass: string): EvidenceCoverageItem[] {
   const categories = [
-    { key: 'identity', label: 'Exact identity / serial / VIN', pattern: /\\b(vin|chassis|serial|reference number|build number|frame number|engine number|object number)\\b/i },
+    { key: 'identity', label: 'Exact identity / serial / VIN', pattern: /\b(vin|chassis|serial|reference number|build number|frame number|engine number|object number)\b/i },
     { key: 'factory', label: 'Factory / maker / production records', pattern: /factory|manufacturer|maker|build sheet|production record|certificate of origin|certificate of authenticity/i },
     { key: 'provenance', label: 'Ownership / provenance timeline', pattern: /owner|ownership|provenance|previously owned|delivered to|consigned by|collection of/i },
     { key: 'transactions', label: 'Auction / completed sale records', pattern: /auction|sold for|sale price|hammer price|realised|realized|completed sale|transaction/i },
