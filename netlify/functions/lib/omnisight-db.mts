@@ -110,22 +110,20 @@ export async function persistOmnisightResearch(
   const assetKey = identityResolution.canonicalKey
 
   const assetClass = /pagani|ferrari|bugatti|porsche|mclaren|lamborghini|\bcar\b|vehicle/i.test(input.assetName) ? 'automotive' : 'unclassified'
+  // Never publish a user-entered asset name into the shared index.
+  // Link to a global asset only when an exact, pre-curated public identifier already exists.
   const { data: globalAsset, error: globalAssetError } = await db
     .from('omnisight_global_assets')
-    .upsert({
-      display_name: input.assetName,
-      canonical_key: assetKey,
-      asset_class: assetClass,
-    }, { onConflict: 'canonical_key' })
     .select('id')
-    .single()
-  if (globalAssetError || !globalAsset) throw new Error('OMNISIGHT_GLOBAL_ASSET_PERSIST_FAILED')
+    .eq('canonical_key', assetKey)
+    .maybeSingle()
+  if (globalAssetError) throw new Error('OMNISIGHT_GLOBAL_ASSET_LOOKUP_FAILED')
 
   const { data: asset, error: assetError } = await db
     .from('omnisight_assets')
     .upsert({
       owner_id: userId,
-      global_asset_id: globalAsset.id,
+      global_asset_id: globalAsset?.id ?? null,
       display_name: input.assetName,
       canonical_key: assetKey,
       asset_class: assetClass,
@@ -181,7 +179,7 @@ export async function persistOmnisightResearch(
     if (globalSourceError || !globalSources) throw new Error('OMNISIGHT_GLOBAL_SOURCE_PERSIST_FAILED')
 
     const sourceIds = new Map(globalSources.map(source => [source.domain, source.id]))
-    const globalLinks = input.citations.flatMap(citation => {
+    const globalLinks = globalAsset ? input.citations.flatMap(citation => {
       const domain = safeHost(citation.url)
       const sourceId = sourceIds.get(domain)
       if (!sourceId) return []
@@ -194,7 +192,7 @@ export async function persistOmnisightResearch(
         evidence_state: 'search_returned',
         last_seen_at: new Date().toISOString(),
       }]
-    })
+    }) : []
     if (globalLinks.length) {
       const { error: linkError } = await db
         .from('omnisight_global_asset_sources')
@@ -298,7 +296,7 @@ export async function persistOmnisightResearch(
     if (relationError) throw new Error('OMNISIGHT_GRAPH_RELATION_PERSIST_FAILED')
   }
 
-  return { globalAssetId: globalAsset.id, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
+  return { globalAssetId: globalAsset?.id ?? null, identityState: identityResolution.identityState, assetId: asset.id, analysisId: savedAnalysis.id, evidenceCount: evidence.length, graphEntityCount: savedEntities.length, graphRelationshipCount: relationships.length, globalSourceCount }
 }
 
 function assetIdsafe(entityIds: Map<string, string>, assetKey: string) {
