@@ -36,6 +36,11 @@ type AnalysisResponse = {
     note: string
   }>
   citations: Array<{ title: string; url: string }>
+  verdict_guard: {
+    applied: boolean
+    reasons: string[]
+    policy: string
+  }
   checkedAt: string
   model: string
   disclaimer: string
@@ -224,6 +229,16 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
                 <span className="text-[10px] text-white/30">{new Date(analysisResult.checkedAt).toLocaleString()}</span>
               </div>
               <p className="text-sm leading-relaxed text-white/80">{analysisResult.analysis.summary}</p>
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                <h3 className="text-[10px] font-bold tracking-[0.18em] text-[#D4AF37]">SERVER VERDICT EVIDENCE GATE</h3>
+                <p className="mt-2 text-xs leading-relaxed text-white/60">{analysisResult.verdict_guard.policy}</p>
+                {analysisResult.verdict_guard.applied && (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-200">
+                    {analysisResult.verdict_guard.reasons.map((reason, index) => <li key={index}>{reason}</li>)}
+                  </ul>
+                )}
+              </div>
+
               {analysisResult.analysis.conflicts.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-[10px] font-bold tracking-widest text-red-200">POTENTIAL CONFLICTS</h3>
