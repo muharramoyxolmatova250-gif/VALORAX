@@ -10,7 +10,7 @@ export type ExtractedAssetIdentifier = {
 
 export function extractAssetIdentifiers(text: string): ExtractedAssetIdentifier[] {
   const found = new Map<string, ExtractedAssetIdentifier>()
-  const vin = /\\b([A-HJ-NPR-Z0-9]{17})\\b/g
+  const vin = /\b([A-HJ-NPR-Z0-9]{17})\b/g
   for (const match of text.matchAll(vin)) {
     const value = match[1].toUpperCase()
     found.set('vin_or_chassis:' + value, {
@@ -21,12 +21,12 @@ export function extractAssetIdentifiers(text: string): ExtractedAssetIdentifier[
   }
 
   const serialPatterns = [
-    /(?:serial(?:\\s+no\\.?|\\s+number)?|production\\s+serial)\\s*[:#-]?\\s*(\\d{1,3}\\s*\\/\\s*\\d{1,3})/gi,
-    /(?:numbered|number)\\s+(\\d{1,3})\\s+(?:of|out of)\\s+(\\d{1,3})/gi,
+    /(?:serial(?:\s+no\.?|\s+number)?|production\s+serial)\s*[:#-]?\s*(\d{1,3}\s*\/\s*\d{1,3})/gi,
+    /(?:numbered|number)\s+(\d{1,3})\s+(?:of|out of)\s+(\d{1,3})/gi,
   ]
   for (const pattern of serialPatterns) {
     for (const match of text.matchAll(pattern)) {
-      const value = match[1].replace(/\\s+/g, '')
+      const value = match[1].replace(/\s+/g, '')
       found.set('production_serial:' + value, {
         identifier_type: 'production_serial',
         value,
