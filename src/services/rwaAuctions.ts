@@ -32,6 +32,8 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
           ? lot.status
           : undefined,
         currency: lot.currency || 'USD',
+        publishedValueUsd: Number(lot.publishedValueUsd ?? lot.currentBid ?? 0),
+        summary: lot.summary || '',
       }))
     } else {
       console.error('External auction API error:', response.status)
