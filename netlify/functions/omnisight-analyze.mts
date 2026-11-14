@@ -1,6 +1,7 @@
 import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
 import { analyzeSourceLineage } from './lib/source-lineage.mjs'
+import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
 import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
@@ -542,10 +543,14 @@ export default async (request: Request) => {
       return json({ error: 'Research completed but could not be safely saved. Please retry later.' }, 503)
     }
 
+    const submittedCoverage = buildEvidenceCoverage(records, expectedChecklist.asset_class)
+    const negativeSpaceAudit = buildNegativeSpaceAudit(submittedCoverage, extracted.citations)
+
     return json({
       analysis: guarded.analysis,
       expected_evidence_checklist: expectedChecklist,
-      submitted_evidence_coverage: buildEvidenceCoverage(records, expectedChecklist.asset_class),
+      submitted_evidence_coverage: submittedCoverage,
+      negative_space_audit: negativeSpaceAudit,
       identity_identifiers: identityIdentifiers,
       curated_market_comparables: marketData,
       citations: extracted.citations,
