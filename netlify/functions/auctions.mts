@@ -69,7 +69,33 @@ export default async () => {
       }]
     })
 
-    return Response.json(lots, {
+    const reportByLot = new Map<string, any>()
+    if (lots.length > 0) {
+      const { data: reports, error: reportError } = await db
+        .from('omnisight_lot_ai_reports')
+        .select('lot_id,status,verdict,summary,created_at')
+        .in('lot_id', lots.map((lot: any) => lot.id))
+        .order('created_at', { ascending: false })
+      if (reportError) {
+        console.error('OMNISIGHT report status lookup failed:', reportError.message)
+      } else {
+        for (const report of reports ?? []) {
+          if (!reportByLot.has(report.lot_id)) reportByLot.set(report.lot_id, report)
+        }
+      }
+    }
+
+    const lotsWithAi = lots.map((lot: any) => {
+      const report = reportByLot.get(lot.id)
+      return {
+        ...lot,
+        aiStatus: report?.status || 'not_started',
+        aiVerdict: report?.verdict || null,
+        aiSummary: report?.summary || '',
+      }
+    })
+
+    return Response.json(lotsWithAi, {
       headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' },
     })
   } catch (error) {
