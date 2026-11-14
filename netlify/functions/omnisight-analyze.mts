@@ -1,6 +1,6 @@
 import type { Config } from '@netlify/functions'
 import { normalizeIntelligence } from './lib/intelligence-guard.mjs'
-import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, persistOmnisightResearch } from './lib/omnisight-db.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch } from './lib/omnisight-db.mjs'
 
 type IncomingEvidence = {
   id: string
@@ -380,6 +380,14 @@ export default async (request: Request) => {
     }, 429)
   }
 
+  let marketData
+  try {
+    marketData = await fetchCuratedMarketSales(db, assetName)
+  } catch (error) {
+    console.error('OMNISIGHT market data lookup failed:', error instanceof Error ? error.message : 'unknown')
+    return json({ error: 'Could not load the rights-cleared historical sales database.' }, 503)
+  }
+
   const expectedChecklist = expectedEvidenceChecklist(assetName)
 
   const prompt = [
@@ -429,6 +437,10 @@ export default async (request: Request) => {
     '',
     'EXPECTED EVIDENCE CHECKLIST (research scope, not proof that every record exists):',
     JSON.stringify(expectedChecklist),
+    '',
+    'RIGHTS-CLEARED CURATED HISTORICAL AUCTION RESULTS (may be empty; an empty list does not mean no market sales exist):',
+    JSON.stringify(marketData),
+    'Use these records only as comparable sale references. Keep exact chassis identifiers, production serials, dates, currencies and sale statuses separate. Never merge a comparable vehicle into the target vehicle history.',
     '',
     'SUBMITTED EVIDENCE (JSON):',
     JSON.stringify(records),
@@ -548,6 +560,7 @@ export default async (request: Request) => {
       expected_evidence_checklist: expectedChecklist,
       submitted_evidence_coverage: buildEvidenceCoverage(records, expectedChecklist.asset_class),
       identity_identifiers: identityIdentifiers,
+      curated_market_comparables: marketData,
       citations: extracted.citations,
       verdict_guard: {
         applied: guarded.applied,
