@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { normalizeFinding } from '../netlify/functions/lib/intelligence-guard.mts'
 import { extractAssetIdentifiers } from '../netlify/functions/lib/omnisight-db.mts'
@@ -72,4 +73,18 @@ test('extracts an explicitly described numbered production sequence', () => {
   const result = extractAssetIdentifiers('Numbered 11 of 30 customer examples')
   assert.equal(result[0]?.identifier_type, 'production_serial')
   assert.equal(result[0]?.normalized_value, '11/30')
+})
+
+test('Pagani real-source fixture keeps target chassis, production serial and comparison car distinct', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/pagani-huayra-r.json', import.meta.url), 'utf8'))
+  assert.equal(fixture.target_identity.vin_or_chassis, 'ZA9H11WTYYSF76003')
+  assert.equal(fixture.target_identity.production_serial, '11/30')
+  const identifiers = extractAssetIdentifiers(fixture.evidence_records[0].claim)
+  assert.deepEqual(identifiers.map(item => [item.identifier_type, item.normalized_value]), [
+    ['vin_or_chassis', 'ZA9H11WTYYSF76003'],
+    ['production_serial', '11/30'],
+  ])
+  assert.match(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76005/)
+  assert.doesNotMatch(fixture.comparison_only[0].claim, /ZA9H11WTYYSF76003/)
+  assert.ok(fixture.expected_invariants.some(item => item.includes('CHF 2,367,500')))
 })
