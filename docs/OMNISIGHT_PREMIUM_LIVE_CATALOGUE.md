@@ -2,7 +2,7 @@
 
 ## Catalogue rule
 
-VALORAX's Global Auction Catalogue contains only lots that are currently active or officially announced as upcoming, and whose documented published value is at least USD 500,000. Ended, sold, unsold, withdrawn and cancelled lots are excluded from the live catalogue. They may be retained in a separate research/history store if the data-use rights allow it, but must not appear as live inventory.
+VALORAX's Global Auction Catalogue contains only lots that are currently currently active, and whose documented published value is at least USD 500,000. Ended, sold, unsold, withdrawn and cancelled lots are excluded from the live catalogue. They may be retained in a separate research/history store if the data-use rights allow it, but must not appear as live inventory.
 
 The USD 500,000 threshold must be supported by a source-linked published estimate low, reserve, asking price, current bid or fixed price. Store the exact basis and source URL. Convert non-USD values only with a recorded FX source, rate and timestamp; never compare raw EUR/GBP/CHF figures directly to USD 500,000. If no reliable USD value can be established, keep the record out of the premium catalogue until reviewed.
 
@@ -12,7 +12,7 @@ The USD 500,000 threshold must be supported by a source-linked published estimat
 - Auction house/source name and direct original lot URL
 - One hero image URL plus a list of source image URLs, subject to image-use rights
 - Published estimate range, reserve/asking/current bid where available, currency, USD threshold basis and value source
-- Auction start/end timestamps and active/upcoming status
+- Auction start/end timestamps and active status
 - Location, lot number and exact asset identifiers where publicly available
 - First/last checked timestamps and source/data/image rights status
 - OMNISIGHT report status, verdict, confidence, evidence references and limitations
