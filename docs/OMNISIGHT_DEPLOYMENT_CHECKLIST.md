@@ -56,6 +56,7 @@ After setting or changing environment variables, trigger a new Netlify deploy so
 3. Add the two target records from `tests/fixtures/pagani-huayra-r.json`:
    - RM Sotheby's lot 132: chassis `ZA9H11WTYYSF76003`, serial `11/30`, published result CHF 2,367,500.
    - Pagani official model facts: 30 examples, 850 HP, 750 Nm, 9,000 rpm redline, 1,050 kg.
+   - The disputed secondary media-centre CHF 5,292,500 figure; it must remain an unresolved scope conflict.
 4. Do not enter the Paris 2025 chassis 005 as if it were the target car's provenance. It is a separate comparable.
 5. Run **ANALYZE LATEST ASSET**.
 6. Confirm the UI shows chassis/VIN and production serial as separate identifiers.
