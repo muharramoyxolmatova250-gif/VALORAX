@@ -45,3 +45,24 @@ test('detects conflicting explicit production-count claims without choosing a wi
   assert.deepEqual(conflict.conflicts?.[0]?.record_ids, ['factory', 'seller'])
   assert.match(conflict.limitations[1], /not proof that either source is correct/)
 })
+
+test('reports saved-graph cross-asset links as reviewable leads', () => {
+  const report = buildDeterministicModuleReport({
+    assetName: 'Pagani Huayra R',
+    records: [],
+    sales: [],
+    crossAssetLinks: [{
+      related_asset: 'Ferrari F40',
+      related_asset_key: 'model-ferrari-f40',
+      shared_entity: 'RM Sotheby\'s',
+      shared_entity_type: 'organization',
+      relationship_type: 'auction_house_mentioned_by_evidence',
+      evidence_id: 'evidence-123',
+      review_status: 'candidate',
+    }],
+  })
+  const module = report.modules.cross_asset_connections
+  assert.equal(module.state, 'ACTIONABLE')
+  assert.match(module.observations[0], /Ferrari F40/)
+  assert.match(module.limitations[0], /not proof/)
+})
