@@ -43,12 +43,10 @@ function locations(xml: string) {
     .map(m => clean(m[1])).filter(Boolean)
 }
 function meta(html: string, key: string, value: string) {
-  const tags = html.match(/<meta\\b[^>]*>/gi) || []
+  const tags = html.match(/<meta\b[^>]*>/gi) || []
   for (const tag of tags) {
-    const attribute = (name: string) => {
-      const match = tag.match(new RegExp('\\\\b' + name + '\\\\s*=\\\\s*([\\\'\\"])(.*?)\\\\1', 'i'))
-      return match?.[2] || ''
-    }
+    const attributes = [...tag.matchAll(/([^\s=]+)\s*=\s*(["'])(.*?)\2/g)]
+    const attribute = (name: string) => attributes.find(match => match[1].toLowerCase() === name.toLowerCase())?.[3] || ''
     if (attribute(key).toLowerCase() === value.toLowerCase()) {
       return clean(attribute('content')).slice(0, 1000)
     }
