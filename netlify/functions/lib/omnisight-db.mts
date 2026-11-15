@@ -159,6 +159,8 @@ export async function fetchLatestOmnisightResearch(db: OmnisightDb, userId: stri
     .select('id')
     .eq('owner_id', userId)
     .eq('display_name', assetName)
+    .order('updated_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
   if (assetError) throw new Error('OMNISIGHT_ASSET_HISTORY_LOOKUP_FAILED')
   if (!asset) return null
