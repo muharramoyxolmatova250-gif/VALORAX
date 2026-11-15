@@ -13,5 +13,8 @@ create index if not exists omnisight_lot_sources_enabled_feed_idx
 
 -- A feed URL must be HTTPS and remain on the registered source domain.
 alter table public.omnisight_lot_sources
+  drop constraint if exists omnisight_lot_sources_feed_url_https_check;
+
+alter table public.omnisight_lot_sources
   add constraint omnisight_lot_sources_feed_url_https_check
   check (feed_url is null or feed_url ~ '^https://');
