@@ -232,8 +232,12 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
       return
     }
 
-    const assetNameForAnalysis = records[0].assetName
+    const assetNameForAnalysis = assetName.trim() || records[0].assetName
     const assetRecords = records.filter(record => record.assetName === assetNameForAnalysis).slice(0, 12)
+    if (assetRecords.length === 0) {
+      setAnalysisError('No evidence records are available for this selected lot yet.')
+      return
+    }
     setAnalysisLoading(true)
     try {
       const response = await fetch('/api/omnisight/analyze', {
