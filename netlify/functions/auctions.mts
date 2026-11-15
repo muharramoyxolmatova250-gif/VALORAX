@@ -11,7 +11,7 @@ export default async () => {
   }
 
   try {
-    // Use only the public anon key. RLS is the publication gate; never use service-role credentials here.
+    // Public catalogue reads use anon credentials and RLS; service-role keys never reach this endpoint.
     const db = createClient(url, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -36,11 +36,17 @@ export default async () => {
       const value = Number(lot.published_value_usd)
       const sourceUrl = typeof lot.canonical_url === 'string' ? lot.canonical_url : ''
       const imageRightsCleared = ['licensed', 'permission_granted'].includes(lot.image_usage_status)
-      const image = imageRightsCleared && typeof lot.hero_image_url === 'string' ? lot.hero_image_url : ''
+      const allowedImages = imageRightsCleared && Array.isArray(lot.image_urls)
+        ? lot.image_urls.filter((item: unknown): item is string => typeof item === 'string' && /^https?:\/\//i.test(item))
+        : []
+      const image = imageRightsCleared && typeof lot.hero_image_url === 'string' && /^https?:\/\//i.test(lot.hero_image_url)
+        ? lot.hero_image_url
+        : allowedImages[0] || ''
       const imageSourceUrl = Array.isArray(lot.image_urls) && typeof lot.image_urls[0] === 'string' ? lot.image_urls[0] : ''
       if (!Number.isFinite(value) || value < MIN_VALUE_USD || !sourceUrl) return []
       if (Number.isFinite(endAt) && endAt <= now) return []
-      const status = 'LIVE'
+      if (Number.isFinite(startAt) && startAt > now) return []
+
       const categoryMap: Record<string, string> = {
         automotive: 'Cars',
         watch: 'Watches',
@@ -57,8 +63,8 @@ export default async () => {
         category: categoryMap[lot.asset_class] || 'Luxury',
         image,
         imageSourceUrl,
-        currentBid: value,
-        reserve: value,
+        currentBid: 0,
+        reserve: 0,
         escrow: 0,
         secondsLeft: Number.isFinite(endAt) ? Math.max(0, Math.floor((endAt - now) / 1000)) : 0,
         bids: 0,
@@ -66,10 +72,10 @@ export default async () => {
         creator: lot.auction_house || 'External auction',
         source: lot.auction_house || 'Auction source',
         sourceUrl,
-        status,
-        currency: 'USD',
+        status: 'LIVE',
+        currency: lot.currency || 'USD',
         publishedValueUsd: value,
-        valueBasis: lot.value_basis,
+        valueBasis: lot.value_basis || 'published_value',
         summary: lot.short_factual_summary || '',
       }]
     })
