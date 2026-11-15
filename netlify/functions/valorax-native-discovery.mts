@@ -119,8 +119,8 @@ async function inspect(raw: string, source: Source): Promise<Candidate | null> {
   return { url: url.href, title, description: description || null, assetClass }
 }
 async function run() {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = Netlify.env.get('SUPABASE_URL')
+  const key = Netlify.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !key) return { ok: false, error: 'MISSING_SUPABASE_CONFIGURATION' }
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data, error } = await db.from('omnisight_lot_sources')
@@ -177,7 +177,7 @@ async function run() {
 }
 export default async (req: Request) => {
   const payload = await req.json().catch(() => ({})) as { next_run?: string }
-  if (process.env.VALORAX_NATIVE_DISCOVERY_ENABLED !== 'true') {
+  if (Netlify.env.get('VALORAX_NATIVE_DISCOVERY_ENABLED') !== 'true') {
     console.log('VALORAX native discovery disabled pending approved sitemap sources and migration.')
     return new Response(JSON.stringify({ ok: false, disabled: true, nextRun: payload.next_run || null }), {
       status: 200, headers: { 'content-type': 'application/json' },
