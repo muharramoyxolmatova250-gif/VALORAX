@@ -1,0 +1,36 @@
+name: OMNISIGHT quality gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/omnisight-server-ai-v0-1]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build and type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test OMNISIGHT evidence guard
+        run: npm run test:omnisight
+      - name: Type-check OMNISIGHT frontend
+        run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck --lib ES2020,DOM --jsx react-jsx --strict --types node src/components/OmniSightPanel.tsx src/components/AuctionDirectory.tsx src/services/rwaAuctions.ts src/types.ts src/omnisight/evidence.ts src/omnisight/intelligence.ts src/vite-env.d.ts
+      - name: Type-check Netlify functions
+        run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck --lib ES2020,DOM --types node netlify/functions/omnisight-analyze.mts netlify/functions/omnisight-discovery.mts netlify/functions/omnisight-lot-analysis.mts netlify/functions/auctions.mts netlify/functions/lib/intelligence-guard.mts netlify/functions/lib/omnisight-db.mts netlify/functions/lib/openai-response.mts
+      - name: Build production frontend
+        run: npm run build
+      - name: Validate Netlify build and function bundling
+        run: npx --yes netlify-cli@latest build --offline

@@ -25,40 +25,28 @@ export type AuctionCategory =
 
 export interface AuctionLot {
   id: string
-
   title: string
-
   subtitle: string
-
   category: Exclude<AuctionCategory, 'ALL'>
-
   image: string
-
+  imageSourceUrl?: string
   currentBid: number
-
   reserve: number
-
   escrow: number
-
   secondsLeft: number
-
   bids: number
-
   verified: boolean
-
   creator: string
-
-  // Auction source
   source?: string
-
-  // Original auction URL
   sourceUrl?: string
-
-  // Auction status
   status?: 'LIVE' | 'UPCOMING' | 'ENDED'
-
-  // Currency used by original auction
   currency?: string
+  publishedValueUsd?: number
+  valueBasis?: string
+  summary?: string
+  aiStatus?: 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'stale' | 'not_started'
+  aiVerdict?: 'GOOD' | 'BAD' | 'UNCERTAIN' | null
+  aiSummary?: string
 }
 
 export interface BidEntry {

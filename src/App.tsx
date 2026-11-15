@@ -6,11 +6,13 @@ import Header from './components/Header'
 import ProfileWall from './components/ProfileWall'
 import AuctionDirectory from './components/AuctionDirectory'
 import AuctionModal from './components/AuctionModal'
+import ExternalLotModal from './components/ExternalLotModal'
 import SovereignDrawer from './components/SovereignDrawer'
 import StakingModal from './components/StakingModal'
 import RegisterModal from './components/RegisterModal'
 import CreateAuctionModal from './components/CreateAuctionModal'
 import LiveTicker from './components/LiveTicker'
+import OmniSightPanel from './components/OmniSightPanel'
 
 import {
   GOLD,
@@ -34,10 +36,13 @@ export default function App() {
   const [stakingOpen, setStakingOpen] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [createAuctionOpen, setCreateAuctionOpen] = useState(false)
+  const [omniSightOpen, setOmniSightOpen] = useState(false)
+  const [selectedAnalysisLot, setSelectedAnalysisLot] = useState<AuctionLot | null>(null)
 
   const [claimProfile, setClaimProfile] = useState<Profile | null>(null)
   const [activeLot, setActiveLot] = useState<AuctionLot | null>(null)
   const [auctionOpen, setAuctionOpen] = useState(false)
+  const [externalLotOpen, setExternalLotOpen] = useState(false)
 
   // Auction lots
   // Eski AUCTION_LOTS demo ma'lumotlari endi ishlatilmaydi.
@@ -90,6 +95,10 @@ export default function App() {
   // Open auction modal
   const openAuction = (lot: AuctionLot) => {
     setActiveLot(lot)
+    if (lot.sourceUrl) {
+      setExternalLotOpen(true)
+      return
+    }
     setAuctionOpen(true)
   }
 
@@ -142,6 +151,20 @@ export default function App() {
             )}
           </AnimatePresence>
 
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.24em] text-[#D4AF37]">VALORAX INTELLIGENCE</p>
+              <h2 className="mt-1 text-lg font-black tracking-widest text-white">OMNISIGHT</h2>
+              <p className="mt-1 text-xs text-white/45">Independent asset evidence workspace</p>
+            </div>
+            <button
+              onClick={() => setOmniSightOpen(true)}
+              className="rounded-md border border-[#D4AF37]/50 px-5 py-3 text-[10px] font-black tracking-[0.18em] text-[#D4AF37] transition hover:bg-[#D4AF37] hover:text-black"
+            >
+              OPEN OMNISIGHT
+            </button>
+          </section>
+
           {/* Auction Directory */}
           <motion.section
             initial={{ opacity: 0, y: 16 }}
@@ -151,6 +174,10 @@ export default function App() {
             <AuctionDirectory
               lots={lots}
               onSelect={openAuction}
+              onAnalyze={lot => {
+                setSelectedAnalysisLot(lot)
+                setOmniSightOpen(true)
+              }}
             />
           </motion.section>
 
@@ -415,6 +442,16 @@ export default function App() {
         </div>
       </main>
 
+      <OmniSightPanel
+        open={omniSightOpen}
+        onClose={() => {
+          setOmniSightOpen(false)
+          setSelectedAnalysisLot(null)
+        }}
+        lots={lots}
+        initialLot={selectedAnalysisLot}
+      />
+
       {/* Footer Ticker */}
       <LiveTicker />
 
@@ -453,6 +490,20 @@ export default function App() {
             onClose={() => setCreateAuctionOpen(false)}
             onCreated={handleLotCreated}
             creatorHandle={sovereignHandle || '0x71...B4'}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* External source lot detail — separate from VALORAX-native bidding */}
+      <AnimatePresence>
+        {externalLotOpen && activeLot && (
+          <ExternalLotModal
+            lot={activeLot}
+            open={externalLotOpen}
+            onClose={() => {
+              setExternalLotOpen(false)
+              setActiveLot(null)
+            }}
           />
         )}
       </AnimatePresence>
