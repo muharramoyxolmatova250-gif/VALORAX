@@ -10,3 +10,9 @@
 [dev]
   command = "npm run dev"
   targetPort = 8443
+
+# Serve the React SPA for client-side routes, including Supabase auth redirects.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
