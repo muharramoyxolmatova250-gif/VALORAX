@@ -6,6 +6,7 @@ import Header from './components/Header'
 import ProfileWall from './components/ProfileWall'
 import AuctionDirectory from './components/AuctionDirectory'
 import AuctionModal from './components/AuctionModal'
+import ExternalLotModal from './components/ExternalLotModal'
 import SovereignDrawer from './components/SovereignDrawer'
 import StakingModal from './components/StakingModal'
 import RegisterModal from './components/RegisterModal'
@@ -40,6 +41,7 @@ export default function App() {
   const [claimProfile, setClaimProfile] = useState<Profile | null>(null)
   const [activeLot, setActiveLot] = useState<AuctionLot | null>(null)
   const [auctionOpen, setAuctionOpen] = useState(false)
+  const [externalLotOpen, setExternalLotOpen] = useState(false)
 
   // Auction lots
   // Eski AUCTION_LOTS demo ma'lumotlari endi ishlatilmaydi.
@@ -92,6 +94,10 @@ export default function App() {
   // Open auction modal
   const openAuction = (lot: AuctionLot) => {
     setActiveLot(lot)
+    if (lot.sourceUrl) {
+      setExternalLotOpen(true)
+      return
+    }
     setAuctionOpen(true)
   }
 
@@ -471,6 +477,20 @@ export default function App() {
             onClose={() => setCreateAuctionOpen(false)}
             onCreated={handleLotCreated}
             creatorHandle={sovereignHandle || '0x71...B4'}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* External source lot detail — separate from VALORAX-native bidding */}
+      <AnimatePresence>
+        {externalLotOpen && activeLot && (
+          <ExternalLotModal
+            lot={activeLot}
+            open={externalLotOpen}
+            onClose={() => {
+              setExternalLotOpen(false)
+              setActiveLot(null)
+            }}
           />
         )}
       </AnimatePresence>
