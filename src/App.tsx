@@ -37,6 +37,7 @@ export default function App() {
   const [registerOpen, setRegisterOpen] = useState(false)
   const [createAuctionOpen, setCreateAuctionOpen] = useState(false)
   const [omniSightOpen, setOmniSightOpen] = useState(false)
+  const [selectedAnalysisLot, setSelectedAnalysisLot] = useState<AuctionLot | null>(null)
 
   const [claimProfile, setClaimProfile] = useState<Profile | null>(null)
   const [activeLot, setActiveLot] = useState<AuctionLot | null>(null)
@@ -173,6 +174,10 @@ export default function App() {
             <AuctionDirectory
               lots={lots}
               onSelect={openAuction}
+              onAnalyze={lot => {
+                setSelectedAnalysisLot(lot)
+                setOmniSightOpen(true)
+              }}
             />
           </motion.section>
 
@@ -437,7 +442,15 @@ export default function App() {
         </div>
       </main>
 
-      <OmniSightPanel open={omniSightOpen} onClose={() => setOmniSightOpen(false)} lots={lots} />
+      <OmniSightPanel
+        open={omniSightOpen}
+        onClose={() => {
+          setOmniSightOpen(false)
+          setSelectedAnalysisLot(null)
+        }}
+        lots={lots}
+        initialLot={selectedAnalysisLot}
+      />
 
       {/* Footer Ticker */}
       <LiveTicker />
