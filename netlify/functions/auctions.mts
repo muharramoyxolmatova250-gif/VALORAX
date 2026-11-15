@@ -18,7 +18,7 @@ export default async () => {
     const { data, error } = await db
       .from('omnisight_discovered_lots')
       .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status,last_seen_at')
-      .eq('listing_status', 'active')
+      .in('listing_status', ['active', 'upcoming'])
       .gte('published_value_usd', MIN_VALUE_USD)
       .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       .order('auction_ends_at', { ascending: true })
@@ -45,7 +45,8 @@ export default async () => {
       const imageSourceUrl = Array.isArray(lot.image_urls) && typeof lot.image_urls[0] === 'string' ? lot.image_urls[0] : ''
       if (!Number.isFinite(value) || value < MIN_VALUE_USD || !sourceUrl) return []
       if (Number.isFinite(endAt) && endAt <= now) return []
-      if (Number.isFinite(startAt) && startAt > now) return []
+      const isUpcoming = lot.listing_status === 'upcoming' || (Number.isFinite(startAt) && startAt > now)
+      if (!isUpcoming && Number.isFinite(startAt) && startAt > now) return []
 
       const categoryMap: Record<string, string> = {
         automotive: 'Cars',
@@ -72,7 +73,7 @@ export default async () => {
         creator: lot.auction_house || 'External auction',
         source: lot.auction_house || 'Auction source',
         sourceUrl,
-        status: 'LIVE',
+        status: isUpcoming ? 'UPCOMING' : 'LIVE',
         currency: lot.currency || 'USD',
         publishedValueUsd: value,
         valueBasis: lot.value_basis || 'published_value',
