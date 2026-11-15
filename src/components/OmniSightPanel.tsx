@@ -370,8 +370,8 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-4 text-sm text-amber-100/80">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div>
-            <strong className="block text-amber-200">Evidence workspace — prototype</strong>
-            Evidence records are saved in this browser. Server research is available only after the Netlify environment variables are configured. AI findings are research leads, not proof of authenticity, ownership or condition.
+            <strong className="block text-amber-200">Evidence workspace — server setup required</strong>
+            Draft evidence records are saved in this browser. Independent server research is currently unavailable until the Netlify server keys and AI model settings are configured. After setup, submitted research is processed server-side and saved to the private VALORAX account. AI findings are research leads, not proof of authenticity, ownership or condition.
           </div>
         </div>
 
