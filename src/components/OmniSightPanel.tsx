@@ -158,6 +158,7 @@ interface Props {
   open: boolean
   onClose: () => void
   lots: AuctionLot[]
+  initialLot?: AuctionLot | null
 }
 
 const statusLabels: Record<EvidenceStatus, string> = {
@@ -168,7 +169,7 @@ const statusLabels: Record<EvidenceStatus, string> = {
   unknown: 'Unknown',
 }
 
-export default function OmniSightPanel({ open, onClose, lots }: Props) {
+export default function OmniSightPanel({ open, onClose, lots, initialLot = null }: Props) {
   const [records, setRecords] = useState<EvidenceRecord[]>(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY)
@@ -281,6 +282,13 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
   }
 
   const importLotEvidence = (lot: AuctionLot) => {
+    const alreadyImported = records.some(record =>
+      record.assetName === lot.title && record.sourceUrl === (lot.sourceUrl || '')
+    )
+    if (alreadyImported) {
+      setAssetName(lot.title)
+      return
+    }
     const record: EvidenceRecord = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
@@ -298,7 +306,12 @@ export default function OmniSightPanel({ open, onClose, lots }: Props) {
       createdAt: new Date().toISOString(),
     }
     setRecords(current => [record, ...current])
+    setAssetName(lot.title)
   }
+
+  useEffect(() => {
+    if (open && initialLot) importLotEvidence(initialLot)
+  }, [open, initialLot?.id])
 
   if (!open) return null
 
