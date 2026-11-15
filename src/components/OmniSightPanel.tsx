@@ -370,8 +370,8 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-4 text-sm text-amber-100/80">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div>
-            <strong className="block text-amber-200">Evidence workspace — prototype</strong>
-            Evidence records are saved in this browser. Server research is available only after the Netlify environment variables are configured. AI findings are research leads, not proof of authenticity, ownership or condition.
+            <strong className="block text-amber-200">Evidence workspace — server setup required</strong>
+            Draft evidence records are saved in this browser. Independent server research is currently unavailable until the Netlify server keys and AI model settings are configured. After setup, submitted research is processed server-side and saved to the private VALORAX account. AI findings are research leads, not proof of authenticity, ownership or condition.
           </div>
         </div>
 
@@ -421,6 +421,42 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
               {analysisLoading ? 'RESEARCHING...' : 'ANALYZE LATEST ASSET'}
             </button>
           </div>
+          {!analysisResult && (
+            <section className="mt-5 rounded-xl border border-[#D4AF37]/25 bg-gradient-to-br from-[#17140B] to-[#0B0B0D] p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[9px] font-bold tracking-[0.24em] text-[#D4AF37]">VALORAX PRIVATE MEMBERSHIP · OMNISIGHT</p>
+                  <h3 className="mt-1 text-lg font-black tracking-widest text-white">PRIVATE ASSET REPORT</h3>
+                  <p className="mt-1 text-[10px] text-white/40">The six-part research report appears here after an evidence-based analysis.</p>
+                </div>
+                <span className="rounded border border-[#D4AF37]/30 px-2 py-1 text-[9px] font-bold tracking-widest text-[#D4AF37]">{analysisLoading ? 'ANALYSIS IN PROGRESS' : 'AWAITING ANALYSIS'}</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  ['GOOD · SUPPORTED SIGNALS', 'Verified positive findings supported by cited evidence.', 'border-emerald-400/25', 'text-emerald-200'],
+                  ['BAD · MATERIAL CONCERNS', 'Conflicts, defects or adverse findings identified in available sources.', 'border-rose-400/25', 'text-rose-200'],
+                  ['RISKS · DUE DILIGENCE', 'Financial, legal, technical and liquidity checks that may be required.', 'border-amber-400/25', 'text-amber-200'],
+                  ['UNCERTAINTIES · NOT VERIFIED', 'Missing records, unresolved claims and evidence gaps.', 'border-white/15', 'text-white/75'],
+                ].map(([title, description, borderTone, titleTone]) => (
+                  <div key={title} className={`space-y-2 rounded-lg border ${borderTone} bg-black/25 p-3`}>
+                    <h4 className={`text-[10px] font-black tracking-[0.15em] ${titleTone}`}>{title}</h4>
+                    <p className="text-xs leading-relaxed text-white/45">{description}</p>
+                    <p className="text-[9px] font-bold tracking-widest text-white/25">AWAITING EVIDENCE ANALYSIS</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 rounded-lg border border-[#D4AF37]/20 bg-black/30 p-4">
+                <h4 className="text-[10px] font-black tracking-[0.18em] text-[#D4AF37]">MARKET ANALYSIS</h4>
+                <p className="mt-2 text-xs leading-relaxed text-white/45">Historical comparables, sold/unsold results and price ranges will appear only when rights-cleared records are available. No unsupported estimate will be shown.</p>
+                <p className="mt-2 text-[9px] font-bold tracking-widest text-white/25">AWAITING MARKET DATA</p>
+              </div>
+              <div className="mt-3 rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/[.06] p-4">
+                <p className="text-[9px] font-bold tracking-[0.2em] text-[#D4AF37]">FINAL OMNISIGHT VERDICT</p>
+                <p className="mt-2 text-xs leading-relaxed text-white/45">A GOOD, BAD or UNCERTAIN conclusion with confidence level and evidence limitations will be shown after analysis.</p>
+                <p className="mt-2 text-[9px] font-bold tracking-widest text-white/25">VERDICT NOT YET AVAILABLE</p>
+              </div>
+            </section>
+          )}
           {analysisError && <p role="alert" className="mt-3 text-xs text-red-300">{analysisError}</p>}
           {analysisResult && (
             <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
@@ -430,6 +466,97 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
                 <span className="text-[10px] text-white/30">{new Date(analysisResult.checkedAt).toLocaleString()}</span>
               </div>
               <p className="text-sm leading-relaxed text-white/80">{analysisResult.analysis.summary}</p>
+              <section className="rounded-xl border border-[#D4AF37]/25 bg-gradient-to-br from-[#17140B] to-[#0B0B0D] p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[9px] font-bold tracking-[0.24em] text-[#D4AF37]">VALORAX PRIVATE MEMBERSHIP · OMNISIGHT</p>
+                    <h3 className="mt-1 text-lg font-black tracking-widest text-white">PRIVATE ASSET REPORT</h3>
+                  </div>
+                  <span className="rounded border border-[#D4AF37]/30 px-2 py-1 text-[9px] font-bold tracking-widest text-[#D4AF37]">EVIDENCE-LED</span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <ReportSection title="GOOD · SUPPORTED SIGNALS" tone="good">
+                    {Object.entries(analysisResult.analysis.intelligence).filter(([, finding]) => finding.status === 'SUPPORTED' && finding.findings.length > 0).length > 0 ? (
+                      Object.entries(analysisResult.analysis.intelligence).filter(([, finding]) => finding.status === 'SUPPORTED' && finding.findings.length > 0).map(([key, finding]) => (
+                        <div key={key} className="border-b border-white/10 pb-2 last:border-0">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">{key.replace(/_/g, ' ')}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-white/70">{finding.summary}</p>
+                          {finding.findings.map((item, index) => <p key={index} className="mt-1 text-[11px] text-white/55">• {item}</p>)}
+                        </div>
+                      ))
+                    ) : <p className="text-xs text-white/50">No supported positive signals were established from the submitted research. This is not a negative verdict.</p>}
+                  </ReportSection>
+                  <ReportSection title="BAD · MATERIAL CONCERNS" tone="bad">
+                    {analysisResult.analysis.conflicts.length > 0 ? analysisResult.analysis.conflicts.map((item, index) => (
+                      <div key={index} className="border-b border-white/10 pb-2 last:border-0">
+                        <p className="text-xs font-bold text-rose-200">{item.topic}</p>
+                        <p className="mt-1 text-[11px] text-white/65">A: {item.evidence_a}</p>
+                        <p className="text-[11px] text-white/65">B: {item.evidence_b}</p>
+                        <p className="mt-1 text-[10px] text-white/40">{item.significance}</p>
+                      </div>
+                    )) : <p className="text-xs text-white/50">No material contradiction was identified in the returned evidence. This does not prove the asset is free of defects or risk.</p>}
+                  </ReportSection>
+                  <ReportSection title="RISKS · DUE DILIGENCE" tone="risk">
+                    {analysisResult.analysis.next_checks.length > 0 ? analysisResult.analysis.next_checks.map((item, index) => <p key={index} className="text-xs leading-relaxed text-white/65">• {item}</p>) : <p className="text-xs text-white/50">No next-check items were returned. Independent inspection and document review may still be necessary.</p>}
+                    {analysisResult.analysis.source_assessments.filter(item => item.reliability === 'weak' || item.reliability === 'unknown').map((item, index) => <p key={'source-' + index} className="text-[11px] text-amber-100/70">Source caution · {item.source}: {item.finding}</p>)}
+                  </ReportSection>
+                  <ReportSection title="UNCERTAINTIES · NOT VERIFIED" tone="unknown">
+                    {analysisResult.analysis.unknowns.length > 0 || analysisResult.negative_space_audit.gaps.length > 0 ? (
+                      <>
+                        {analysisResult.analysis.unknowns.map((item, index) => <p key={'unknown-' + index} className="text-xs leading-relaxed text-white/65">• {item}</p>)}
+                        {analysisResult.negative_space_audit.gaps.map((item, index) => <p key={'gap-' + index} className="text-xs leading-relaxed text-amber-100/65">• {item.label}: {item.why_it_matters} Recommended evidence: {item.recommended_next_evidence}</p>)}
+                      </>
+                    ) : <p className="text-xs text-white/50">No explicit unknowns were returned. Review the evidence coverage and source limitations before relying on this report.</p>}
+                  </ReportSection>
+                </div>
+                <div className="mt-3 rounded-lg border border-[#D4AF37]/20 bg-black/30 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-[10px] font-black tracking-[0.18em] text-[#D4AF37]">MARKET ANALYSIS</h4>
+                    <span className="text-[9px] text-white/35">Rights-cleared database comparables only</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <MarketMetric label="RECORDS" value={analysisResult.market_summary.total_records} />
+                    <MarketMetric label="SOLD" value={analysisResult.market_summary.sold_records} />
+                    <MarketMetric label="UNSOLD" value={analysisResult.market_summary.unsold_records} />
+                    <MarketMetric label="WITHDRAWN" value={analysisResult.market_summary.withdrawn_records} />
+                  </div>
+                  {analysisResult.market_summary.currency_groups.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {analysisResult.market_summary.currency_groups.map(group => (
+                        <div key={group.currency} className="rounded border border-white/10 p-3 text-xs text-white/65">
+                          <strong className="text-white">{group.currency}</strong> · {group.count} records · low {group.minimum.toLocaleString()} · median {group.median.toLocaleString()} · high {group.maximum.toLocaleString()}
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="mt-3 text-xs text-amber-100/65">No rights-cleared historical sale records are currently available in the database. No market price estimate is presented.</p>}
+                  {analysisResult.market_summary.limitations.map((item, index) => <p key={index} className="mt-2 text-[10px] text-white/40">{item}</p>)}
+                  {analysisResult.curated_market_comparables.records.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {analysisResult.curated_market_comparables.records.map((sale, index) => (
+                        <a key={sale.source_url + index} href={sale.source_url} target="_blank" rel="noreferrer" className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 p-3 text-xs hover:border-[#D4AF37]/40">
+                          <span className="text-white/75">{sale.model_year || 'Year n/a'} {sale.make} {sale.model} · {sale.auction_house}</span>
+                          <span className="text-[#D4AF37]">{sale.currency} {sale.sale_amount.toLocaleString()} · {sale.result_status.toUpperCase()}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/[.06] p-4">
+                  <p className="text-[9px] font-bold tracking-[0.2em] text-[#D4AF37]">FINAL OMNISIGHT VERDICT</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <span className={`text-xl font-black tracking-widest ${analysisResult.analysis.verdict === 'GOOD' ? 'text-emerald-300' : analysisResult.analysis.verdict === 'BAD' ? 'text-rose-300' : 'text-amber-200'}`}>{analysisResult.analysis.verdict}</span>
+                    <span className="text-[10px] text-white/45">Confidence {Math.round(analysisResult.analysis.confidence * 100)}%</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-white/65">{analysisResult.analysis.summary}</p>
+                  <p className="mt-2 text-[10px] text-white/35">Research assessment only — not authentication, a condition report, legal advice or a guaranteed valuation.</p>
+                </div>
+                {analysisResult.citations.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-[9px] font-bold tracking-widest text-white/40">REPORT SOURCES</p>
+                    <div className="space-y-1">{analysisResult.citations.map((citation, index) => <a key={citation.url + index} href={citation.url} target="_blank" rel="noreferrer" className="block break-all text-[10px] text-[#D4AF37] hover:underline">{citation.title || citation.url}</a>)}</div>
+                  </div>
+                )}
+              </section>
               <section className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
                 <h3 className="text-[10px] font-bold tracking-[0.18em] text-white/55">API USAGE & COST TRANSPARENCY</h3>
                 {analysisResult.analysis.provider_usage ? (
@@ -795,6 +922,16 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
       </div>
     </div>
   )
+}
+
+function ReportSection({ title, tone, children }: { title: string; tone: 'good' | 'bad' | 'risk' | 'unknown'; children: React.ReactNode }) {
+  const toneClass = tone === 'good' ? 'border-emerald-400/25' : tone === 'bad' ? 'border-rose-400/25' : tone === 'risk' ? 'border-amber-400/25' : 'border-white/15'
+  const titleClass = tone === 'good' ? 'text-emerald-200' : tone === 'bad' ? 'text-rose-200' : tone === 'risk' ? 'text-amber-200' : 'text-white/75'
+  return <div className={`space-y-2 rounded-lg border ${toneClass} bg-black/25 p-3`}><h4 className={`text-[10px] font-black tracking-[0.15em] ${titleClass}`}>{title}</h4><div className="space-y-2">{children}</div></div>
+}
+
+function MarketMetric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded border border-white/10 bg-white/[0.02] p-2"><p className="text-[8px] tracking-widest text-white/35">{label}</p><p className="mt-1 text-lg font-black text-[#D4AF37]">{value.toLocaleString()}</p></div>
 }
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
