@@ -48,18 +48,16 @@ export default async () => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data: queued, error: queueError } = await db
-    .from('omnisight_lot_ai_reports')
-    .select('id,lot_id,report_version')
-    .eq('status', 'queued')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  const workerId = process.env.OMNISIGHT_WORKER_ID || 'netlify-lot-analysis'
+  const { data: claimedRows, error: queueError } = await db.rpc('omnisight_claim_ai_report', {
+    p_worker_id: workerId,
+  })
 
   if (queueError) {
-    console.error('OMNISIGHT AI queue lookup failed:', queueError.message)
+    console.error('OMNISIGHT AI atomic claim failed:', queueError.message)
     return new Response('AI queue unavailable', { status: 503 })
   }
+  const queued = Array.isArray(claimedRows) ? claimedRows[0] : null
   if (!queued) return Response.json({ ok: true, processed: 0 })
 
   const { data: lot, error: lotError } = await db
@@ -69,16 +67,16 @@ export default async () => {
     .maybeSingle()
 
   if (lotError || !lot) {
-    await db.from('omnisight_lot_ai_reports').update({ status: 'failed', limitations: ['Underlying lot record could not be loaded.'] }).eq('id', queued.id)
+    await db.from('omnisight_lot_ai_reports').update({ status: 'failed', locked_at: null, locked_by: null, heartbeat_at: null, limitations: ['Underlying lot record could not be loaded.'] }).eq('id', queued.id)
     return new Response('Lot record unavailable', { status: 422 })
   }
 
   if (!['active', 'upcoming'].includes(lot.listing_status) || Number(lot.published_value_usd) < 500_000 || lot.currency !== 'USD') {
-    await db.from('omnisight_lot_ai_reports').update({ status: 'stale', limitations: ['Lot no longer meets live/upcoming USD 500,000+ catalogue eligibility.'] }).eq('id', queued.id)
+    await db.from('omnisight_lot_ai_reports').update({ status: 'stale', locked_at: null, locked_by: null, heartbeat_at: null, limitations: ['Lot no longer meets live/upcoming USD 500,000+ catalogue eligibility.'] }).eq('id', queued.id)
     return Response.json({ ok: true, skipped: 'LOT_NOT_ELIGIBLE' })
   }
 
-  await db.from('omnisight_lot_ai_reports').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', queued.id)
+  await db.from('omnisight_lot_ai_reports').update({ heartbeat_at: new Date().toISOString() }).eq('id', queued.id)
 
   const prompt = [
     'You are OMNISIGHT, an evidence-first research assistant for high-value auction assets.',
@@ -160,6 +158,9 @@ export default async () => {
 
     const { error: saveError } = await db.from('omnisight_lot_ai_reports').update({
       status: complete ? 'completed' : 'partial',
+      locked_at: null,
+      locked_by: null,
+      heartbeat_at: null,
       verdict,
       confidence,
       summary: typeof result.summary === 'string' ? result.summary.slice(0, 4000) : 'OMNISIGHT analysis completed with limited summary.',
@@ -186,6 +187,10 @@ export default async () => {
     const message = error instanceof Error ? error.message : 'LOT_ANALYSIS_FAILED'
     await db.from('omnisight_lot_ai_reports').update({
       status: 'failed',
+      locked_at: null,
+      locked_by: null,
+      heartbeat_at: null,
+      last_error_code: message.slice(0, 120),
       limitations: [message.slice(0, 500)],
       completed_at: new Date().toISOString(),
     }).eq('id', queued.id)
