@@ -6,7 +6,7 @@ type SearchResult = { title?: string; url?: string; content?: string; engine?: s
 type SearchPass = { assetClass: string; query: string }
 
 const PASSES: SearchPass[] = [
-  { assetClass: 'hypercar', query: 'site:*.com auction lot hypercar upcoming sale estimate' },
+  { assetClass: 'hypercar', query: 'hypercar auction lot upcoming sale estimate' },
   { assetClass: 'classic_car', query: 'classic car auction lot upcoming sale estimate' },
   { assetClass: 'racing_car', query: 'historic racing car auction lot upcoming sale' },
   { assetClass: 'watch', query: 'rare luxury watch auction lot upcoming sale estimate' },
@@ -48,19 +48,6 @@ function safeResult(item: SearchResult, pass: SearchPass) {
   }
 }
 
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const output: R[] = []
-  let next = 0
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++
-      output[index] = await fn(items[index])
-    }
-  })
-  await Promise.all(workers)
-  return output
-}
-
 async function runGlobalSearch() {
   const base = process.env.SEARXNG_BASE_URL
   const supabaseUrl = process.env.SUPABASE_URL
@@ -68,6 +55,10 @@ async function runGlobalSearch() {
   if (!base || !supabaseUrl || !serviceKey) {
     console.error('OMNISIGHT global search missing SEARXNG_BASE_URL or Supabase server configuration')
     return { ok: false, error: 'MISSING_SERVER_CONFIGURATION' }
+  }
+  if (/^sb_publishable_/i.test(serviceKey) || /^eyJ/i.test(serviceKey) && serviceKey.split('.').length !== 3) {
+    console.error('OMNISIGHT requires a server-only Supabase secret/service-role key, not a publishable key')
+    return { ok: false, error: 'INVALID_SUPABASE_SERVER_KEY_TYPE' }
   }
 
   let endpoint: URL
@@ -78,40 +69,38 @@ async function runGlobalSearch() {
     return { ok: false, error: 'INVALID_SEARXNG_BASE_URL' }
   }
 
-  const search = async (pass: SearchPass) => {
-    const url = new URL('/search', endpoint)
-    url.searchParams.set('q', pass.query)
-    url.searchParams.set('format', 'json')
-    url.searchParams.set('language', 'en')
-    url.searchParams.set('safesearch', '1')
-    url.searchParams.set('pageno', '1')
-    const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(18000),
-    })
-    if (!response.ok) throw new Error('SEARXNG_HTTP_' + response.status)
-    const payload = await response.json() as { results?: SearchResult[] }
-    return (Array.isArray(payload.results) ? payload.results : [])
-      .map(item => safeResult(item, pass))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-  }
-
-  const batches = await mapLimit(PASSES, 3, async pass => {
-    try { return await search(pass) }
-    catch (error) {
+  const candidatesMap = new Map<string, NonNullable<ReturnType<typeof safeResult>>>()
+  let failedPasses = 0
+  for (const pass of PASSES) {
+    if (candidatesMap.size >= MAX_PER_RUN) break
+    try {
+      const url = new URL('/search', endpoint)
+      url.searchParams.set('q', pass.query)
+      url.searchParams.set('format', 'json')
+      url.searchParams.set('engines', 'bing')
+      url.searchParams.set('language', 'en')
+      url.searchParams.set('safesearch', '1')
+      url.searchParams.set('pageno', '1')
+      const response = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(18000),
+      })
+      if (!response.ok) throw new Error('SEARXNG_HTTP_' + response.status)
+      const payload = await response.json() as { results?: SearchResult[] }
+      for (const item of Array.isArray(payload.results) ? payload.results : []) {
+        const result = safeResult(item, pass)
+        if (result && !candidatesMap.has(result.url)) candidatesMap.set(result.url, result)
+        if (candidatesMap.size >= MAX_PER_RUN) break
+      }
+    } catch (error) {
+      failedPasses++
       console.error('OMNISIGHT search pass failed', pass.assetClass, error instanceof Error ? error.message : 'UNKNOWN')
-      return []
     }
-  })
-
-  const unique = new Map<string, NonNullable<ReturnType<typeof safeResult>>>()
-  for (const result of batches.flat()) {
-    if (!unique.has(result.url)) unique.set(result.url, result)
-    if (unique.size >= MAX_PER_RUN) break
   }
-  const candidates = [...unique.values()]
+
+  const candidates = [...candidatesMap.values()]
   if (!candidates.length) {
-    const summary = { ok: true, searchPasses: PASSES.length, candidatesFound: 0, lotsUpserted: 0, note: 'No search results passed basic URL checks.' }
+    const summary = { ok: true, searchPasses: PASSES.length, failedPasses, candidatesFound: 0, lotsUpserted: 0, note: 'No search results passed basic URL checks.' }
     console.log('OMNISIGHT global search', JSON.stringify(summary))
     return summary
   }
@@ -150,10 +139,9 @@ async function runGlobalSearch() {
   const rows = candidates.flatMap(item => {
     const sourceId = sourceIds.get(item.host)
     if (!sourceId) return []
-    const key = item.url
     return [{
       source_id: sourceId,
-      source_lot_key: key,
+      source_lot_key: item.url,
       canonical_url: item.url,
       title: item.title,
       asset_class: item.assetClass,
@@ -181,10 +169,11 @@ async function runGlobalSearch() {
 
   const summary = {
     ok: true,
+    searchEngine: 'bing',
     searchPasses: PASSES.length,
+    failedPasses,
     uniqueCandidates: candidates.length,
     lotsUpserted: saved,
-    targetPerHour: 100,
     theoreticalCandidateCeilingPerHour: MAX_PER_RUN * 4,
     verifiedLots: 0,
     publishedToLiveLots: 0,
