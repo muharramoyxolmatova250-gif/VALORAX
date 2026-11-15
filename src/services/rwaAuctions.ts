@@ -29,6 +29,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       status: lot.status === 'LIVE' || lot.status === 'UPCOMING' ? lot.status : undefined,
       currency: lot.currency || 'USD',
       publishedValueUsd: Number(lot.publishedValueUsd ?? 0),
+      valueBasis: typeof lot.valueBasis === 'string' ? lot.valueBasis : '',
       summary: typeof lot.summary === 'string' ? lot.summary : '',
       aiStatus: lot.aiStatus || 'not_started',
       aiVerdict: lot.aiVerdict || null,
@@ -64,6 +65,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       creator: row.creator || '',
       currency: 'USD',
       publishedValueUsd: Math.max(Number(row.reserve ?? 0), Number(row.current_bid ?? 0)),
+      valueBasis: 'platform_bid',
     }))
   } catch (error) {
     console.error('VALORAX own auction query failed:', error)
