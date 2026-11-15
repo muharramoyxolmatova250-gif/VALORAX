@@ -63,7 +63,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return output
 }
 
-async function runGlobalSearch() {
+export async function runGlobalSearch() {
   const base = process.env.SEARXNG_BASE_URL
   const supabaseUrl = process.env.SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
