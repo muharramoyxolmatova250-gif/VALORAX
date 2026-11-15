@@ -6,7 +6,7 @@ import { analyzeSourceLineage } from './lib/source-lineage.mjs'
 import { buildNegativeSpaceAudit } from './lib/negative-space.mjs'
 import { summarizeComparableSales } from './lib/market-intelligence.mjs'
 import { extractOpenAiResponse } from './lib/openai-response.mjs'
-import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch, findCrossAssetConnections } from './lib/omnisight-db.mjs'
+import { authenticateOmnisightUser, consumeOmnisightCredit, consumeOmnisightRateLimit, createOmnisightAdmin, extractAssetIdentifiers, fetchCuratedMarketSales, persistOmnisightResearch, findCrossAssetConnections, fetchLatestOmnisightResearch, updateOmnisightResearchReport } from './lib/omnisight-db.mjs'
 
 type IntelligenceFinding = {
   status: 'SUPPORTED' | 'PARTIAL' | 'NOT_FOUND' | 'CONFLICT' | 'NOT_APPLICABLE'
@@ -226,8 +226,8 @@ function buildEvidenceCoverage(records: Array<{ id: string; claim: string; sourc
 
 
 export default async (request: Request) => {
-  if (request.method !== 'POST') {
-    return json({ error: 'Only POST is supported.' }, 405)
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    return json({ error: 'Only GET and POST are supported.' }, 405)
   }
 
   const origin = request.headers.get('origin')
@@ -241,12 +241,14 @@ export default async (request: Request) => {
     }
   }
 
-  const declaredLength = Number(request.headers.get('content-length') || 0)
-  if (declaredLength > 40_000) return json({ error: 'Request is too large.' }, 413)
+  if (request.method === 'POST') {
+    const declaredLength = Number(request.headers.get('content-length') || 0)
+    if (declaredLength > 40_000) return json({ error: 'Request is too large.' }, 413)
+  }
 
   // Trust Netlify's platform-provided client IP only; do not trust caller-supplied X-Forwarded-For.
   const ip = request.headers.get('x-nf-client-connection-ip') || 'unknown'
-  if (ip !== 'unknown' && rateLimited(ip)) {
+  if (request.method === 'POST' && ip !== 'unknown' && rateLimited(ip)) {
     return json({ error: 'Rate limit reached. Please wait one minute and try again.' }, 429)
   }
 
@@ -264,6 +266,18 @@ export default async (request: Request) => {
     return json({ error: 'Secure OMNISIGHT account service is not configured.' }, 503)
   }
   if (!user) return json({ error: 'Sign in with your VALORAX account to run private research.' }, 401)
+
+  if (request.method === 'GET') {
+    const assetName = cleanText(new URL(request.url).searchParams.get('asset') || '', 240)
+    if (!assetName) return json({ error: 'An asset query parameter is required.' }, 400)
+    try {
+      const latest = await fetchLatestOmnisightResearch(db, user.id, assetName)
+      return latest ? json(latest.report) : json({ error: 'No saved OMNISIGHT report exists for this asset.' }, 404)
+    } catch (error) {
+      console.error('OMNISIGHT report history lookup failed:', error instanceof Error ? error.message : 'unknown')
+      return json({ error: 'Could not load the saved OMNISIGHT report.' }, 503)
+    }
+  }
 
   let userRate
   try {
@@ -507,7 +521,7 @@ export default async (request: Request) => {
       assetName, records, sales: marketData.records, crossAssetLinks: crossAssetDiscovery.links,
     })
 
-    return json({
+    const fullReport = {
       analysis: analysisWithUsage,
       deterministic_modules: deterministicModules,
       cross_asset_discovery: crossAssetDiscovery,
@@ -529,7 +543,14 @@ export default async (request: Request) => {
       persistence,
       usage: { used: quota.used, limit: quota.monthly_limit, resets_at: quota.resets_at },
       disclaimer: 'Research triage only. Not an authentication, title, condition or valuation certificate.',
-    })
+    }
+    try {
+      await updateOmnisightResearchReport(db, user.id, persistence.analysisId, fullReport)
+    } catch (error) {
+      console.error('OMNISIGHT full report update failed:', error instanceof Error ? error.message : 'unknown')
+      return json({ error: 'Research ran but the complete report could not be saved. Please retry.' }, 503)
+    }
+    return json(fullReport)
   } catch (error) {
     console.error('OMNISIGHT analysis failed:', error instanceof Error ? error.name : 'unknown')
     return json({ error: 'OMNISIGHT could not complete the research request.' }, 502)
