@@ -163,9 +163,7 @@ function LotCard({
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             style={{ filter: 'brightness(0.72) saturate(0.84)' }}
-            onError={event => {
-              event.currentTarget.style.display = 'none'
-            }}
+            onError={event => { event.currentTarget.style.display = 'none' }}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center"
@@ -261,33 +259,6 @@ function LotCard({
           )}
         </div>
 
-        {/* OMNISIGHT report state */}
-        <div className="flex items-center justify-between text-[8px] tracking-widest uppercase">
-          <span className="text-white/35">OMNISIGHT INTELLIGENCE</span>
-          <span
-            className="font-bold"
-            style={{
-              color: lot.aiStatus === 'completed'
-                ? '#34D399'
-                : lot.aiStatus === 'partial'
-                  ? '#D4AF37'
-                  : 'rgba(255,255,255,0.45)',
-            }}
-          >
-            {lot.aiStatus === 'completed'
-              ? 'ANALYSIS COMPLETE'
-              : lot.aiStatus === 'partial'
-                ? 'PARTIAL ANALYSIS'
-                : lot.aiStatus === 'running'
-                  ? 'ANALYZING'
-                  : lot.aiStatus === 'queued'
-                    ? 'ANALYSIS QUEUED'
-                    : lot.aiStatus === 'failed'
-                      ? 'ANALYSIS FAILED'
-                      : 'AWAITING ANALYSIS'}
-          </span>
-        </div>
-
         {/* Stats */}
         <div className="grid grid-cols-2 gap-2">
           <div
@@ -357,38 +328,14 @@ function LotCard({
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {lot.imageSourceUrl && (
-              <a
-                href={lot.imageSourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                SOURCE IMAGE <ExternalLink size={9} />
-              </a>
-            )}
-            {lot.sourceUrl && (
-              <a
-                href={lot.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                ORIGINAL SOURCE <ExternalLink size={9} />
-              </a>
-            )}
-            <motion.span
-              whileHover={{ x: 2 }}
-              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
-              style={{ color: GOLD }}
-            >
-              VIEW LOT
-              <ExternalLink size={9} />
-            </motion.span>
-          </div>
+          <motion.span
+            whileHover={{ x: 2 }}
+            className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+            style={{ color: GOLD }}
+          >
+            VIEW LOT
+            <ExternalLink size={9} />
+          </motion.span>
         </div>
       </div>
     </motion.div>
@@ -614,38 +561,14 @@ export default function AuctionDirectory({
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {lot.imageSourceUrl && (
-              <a
-                href={lot.imageSourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                SOURCE IMAGE <ExternalLink size={9} />
-              </a>
-            )}
-            {lot.sourceUrl && (
-              <a
-                href={lot.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                ORIGINAL SOURCE <ExternalLink size={9} />
-              </a>
-            )}
-            <motion.span
-              whileHover={{ x: 2 }}
-              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
-              style={{ color: GOLD }}
-            >
-              VIEW LOT
-              <ExternalLink size={9} />
-            </motion.span>
-          </div>
+          <motion.span
+            whileHover={{ x: 2 }}
+            className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+            style={{ color: GOLD }}
+          >
+            VIEW LOT
+            <ExternalLink size={9} />
+          </motion.span>
         </div>
       </div>
     </motion.div>
@@ -870,38 +793,14 @@ export default function AuctionDirectory({
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {lot.imageSourceUrl && (
-              <a
-                href={lot.imageSourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                SOURCE IMAGE <ExternalLink size={9} />
-              </a>
-            )}
-            {lot.sourceUrl && (
-              <a
-                href={lot.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
-              >
-                ORIGINAL SOURCE <ExternalLink size={9} />
-              </a>
-            )}
-            <motion.span
-              whileHover={{ x: 2 }}
-              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
-              style={{ color: GOLD }}
-            >
-              VIEW LOT
-              <ExternalLink size={9} />
-            </motion.span>
-          </div>
+          <motion.span
+            whileHover={{ x: 2 }}
+            className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+            style={{ color: GOLD }}
+          >
+            VIEW LOT
+            <ExternalLink size={9} />
+          </motion.span>
         </div>
       </div>
     </motion.div>
