@@ -224,6 +224,8 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
   useEffect(() => {
     if (!open || !session?.access_token || !selectedAssetName) return
     let active = true
+    setAnalysisResult(null)
+    setAnalysisError('')
     setReportLoading(true)
     fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
       method: 'GET',
