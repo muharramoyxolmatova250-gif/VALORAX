@@ -187,6 +187,7 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authEmail, setAuthEmail] = useState('')
   const [authMessage, setAuthMessage] = useState('')
@@ -218,10 +219,37 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
   }, [])
 
   const audit = useMemo(() => auditEvidence(records), [records])
+  const selectedAssetName = assetName.trim() || initialLot?.title || records[0]?.assetName || ''
+
+  useEffect(() => {
+    if (!open || !session?.access_token || !selectedAssetName) return
+    let active = true
+    setReportLoading(true)
+    fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: 'no-store',
+    })
+      .then(async response => {
+        const payload = await response.json()
+        if (response.status === 404) return null
+        if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not load saved report.')
+        return payload as AnalysisResponse
+      })
+      .then(result => {
+        if (active && result) setAnalysisResult(result)
+      })
+      .catch(caught => {
+        if (active) setAnalysisError(caught instanceof Error ? caught.message : 'Could not load saved report.')
+      })
+      .finally(() => {
+        if (active) setReportLoading(false)
+      })
+    return () => { active = false }
+  }, [open, session?.access_token, selectedAssetName])
 
   const runAnalysis = async () => {
     setAnalysisError('')
-    setAnalysisResult(null)
     if (records.length === 0) {
       setAnalysisError('Add at least one evidence record before analysis.')
       return
@@ -232,7 +260,7 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
       return
     }
 
-    const assetNameForAnalysis = assetName.trim() || records[0].assetName
+    const assetNameForAnalysis = selectedAssetName
     const assetRecords = records.filter(record => record.assetName === assetNameForAnalysis).slice(0, 12)
     if (assetRecords.length === 0) {
       setAnalysisError('No evidence records are available for this selected lot yet.')
@@ -416,6 +444,7 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
             <div>
               <h2 className="text-sm font-bold tracking-widest text-white">SERVER-SIDE INTELLIGENCE</h2>
               <p className="mt-1 text-xs text-white/40">Research sources, compare claims and identify evidence conflicts · 10 analyses/month</p>
+              {reportLoading && <p className="mt-2 text-[10px] text-[#D4AF37]">RESTORING YOUR LAST SAVED REPORT...</p>}
             </div>
             <button type="button" onClick={runAnalysis} disabled={analysisLoading || records.length === 0 || !session} className="rounded-md bg-gradient-to-r from-[#D4AF37] to-[#A98522] px-4 py-3 text-[10px] font-black tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40">
               {analysisLoading ? 'RESEARCHING...' : 'ANALYZE LATEST ASSET'}
