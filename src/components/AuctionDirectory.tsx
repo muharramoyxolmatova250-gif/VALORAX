@@ -155,14 +155,25 @@ function LotCard({
     >
       {/* Image */}
       <div className="relative h-56 overflow-hidden">
-        <img
-          src={lot.image}
-          alt={lot.title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          style={{
-            filter: 'brightness(0.68) saturate(0.82)',
-          }}
-        />
+        {lot.image ? (
+          <img
+            src={lot.image}
+            alt={lot.title}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            style={{ filter: 'brightness(0.72) saturate(0.84)' }}
+            onError={event => {
+              event.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center"
+            style={{ background: 'radial-gradient(circle at 50% 35%, rgba(212,175,55,0.14), transparent 42%), linear-gradient(145deg,#171719,#080809)' }}>
+            <span className="text-5xl" style={{ color: 'rgba(212,175,55,0.55)' }}>◇</span>
+            <span className="mt-3 text-[8px] tracking-[0.28em] font-bold" style={{ color: 'rgba(212,175,55,0.45)' }}>VALORAX PRIVATE VAULT</span>
+          </div>
+        )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-transparent to-transparent" />
 
@@ -290,7 +301,7 @@ function LotCard({
               className="text-[8px] tracking-widest font-bold uppercase"
               style={{ color: GOLD_DIM }}
             >
-              CURRENT BID
+              {lot.currentBid > 0 ? 'CURRENT BID' : lot.publishedValueUsd && lot.publishedValueUsd > 0 ? 'PUBLISHED VALUE' : 'CURRENT BID'}
             </p>
 
             <p
@@ -298,8 +309,520 @@ function LotCard({
               style={{ color: GOLD }}
             >
               {lot.currentBid > 0
-                ? '$' + lot.currentBid.toLocaleString()
-                : '—'}
+                ? '
+            </p>
+          </div>
+
+          <div
+            className="p-3 rounded-sm"
+            style={{
+              background: 'rgba(212,175,55,0.035)',
+              border: `1px solid ${GOLD_FAINT}`,
+            }}
+          >
+            <p
+              className="text-[8px] tracking-widest font-bold uppercase"
+              style={{ color: GOLD_DIM }}
+            >
+              <Clock size={8} className="inline mr-1" />
+              TIME
+            </p>
+
+            <p
+              className="font-black text-base mt-1"
+              style={{ color: GOLD }}
+            >
+              {lot.secondsLeft > 0 ? formatCountdown(
+                countdown.days,
+                countdown.hours,
+                countdown.minutes,
+                countdown.seconds,
+              ) : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom information */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gavel
+              size={11}
+              style={{ color: GOLD_DIM }}
+            />
+
+            <span className="text-[9px] text-white/35">
+              {lot.bids > 0
+                ? `${lot.bids} bids`
+                : 'Auction data'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {lot.imageSourceUrl && (
+              <a
+                href={lot.imageSourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                SOURCE IMAGE <ExternalLink size={9} />
+              </a>
+            )}
+            {lot.sourceUrl && (
+              <a
+                href={lot.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                ORIGINAL SOURCE <ExternalLink size={9} />
+              </a>
+            )}
+            <motion.span
+              whileHover={{ x: 2 }}
+              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+              style={{ color: GOLD }}
+            >
+              VIEW LOT
+              <ExternalLink size={9} />
+            </motion.span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+export default function AuctionDirectory({
+  lots,
+  onSelect,
+}: AuctionDirectoryProps) {
+  const [activeTab, setActiveTab] =
+    useState<AuctionCategory>('ALL')
+    const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredLots = lots.filter(lot => {
+  const matchesCategory =
+    activeTab === 'ALL' ||
+    lot.category === activeTab
+
+  const query = searchQuery.trim().toLowerCase()
+
+  const matchesSearch = [
+    lot.title,
+    lot.subtitle,
+    lot.category,
+    lot.source,
+  ]
+    .filter(Boolean)
+    .some(value =>
+      String(value).toLowerCase().includes(query)
+    )
+
+  return matchesCategory && (!query || matchesSearch)
+})
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+          <p
+            className="text-[9px] tracking-[0.25em] font-bold uppercase mb-2"
+            style={{ color: GOLD_DIM }}
+          >
+            GLOBAL AUCTION NETWORK
+          </p>
+
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Live Auction Vaults
+          </h2>
+
+          <p className="text-xs text-white/35 mt-2 max-w-xl">
+            Curated access to rare assets across global
+            auction markets.
+          </p>
+        </div>
+
+        <div
+          className="text-[9px] font-mono tracking-widest"
+          style={{ color: GOLD_DIM }}
+        >
+          {filteredLots.length} LOTS
+        </div>
+      </div>
+
+      {/* Search */}
+<div
+  className="flex items-center gap-3 px-3.5 py-3 rounded-sm"
+  style={{
+    background: 'rgba(255,255,255,0.025)',
+    border: '1px solid rgba(212,175,55,0.14)',
+  }}
+>
+  <Search size={14} style={{ color: GOLD_DIM }} />
+
+  <input
+    type="text"
+    value={searchQuery}
+    onChange={event => setSearchQuery(event.target.value)}
+    placeholder="Search auctions, cars, watches..."
+    className="flex-1 min-w-0 bg-transparent text-xs text-white outline-none placeholder:text-white/30"
+    aria-label="Search auction lots"
+  />
+
+  {searchQuery && (
+    <button
+      type="button"
+      onClick={() => setSearchQuery('')}
+      style={{ color: GOLD_DIM }}
+      aria-label="Clear search"
+    >
+      <X size={14} />
+    </button>
+  )}
+</div>
+
+      {/* Categories */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {TABS.map(tab => {
+          const active = activeTab === tab
+
+          const count =
+            tab === 'ALL'
+              ? lots.length
+              : lots.filter(lot => lot.category === tab).length
+
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="shrink-0 px-3.5 py-2 rounded-sm transition-all"
+              style={{
+                background: active
+                  ? 'rgba(212,175,55,0.10)'
+                  : 'rgba(255,255,255,0.025)',
+                border: active
+                  ? '1px solid rgba(212,175,55,0.35)'
+                  : '1px solid rgba(255,255,255,0.07)',
+                color: active
+                  ? GOLD
+                  : 'rgba(255,255,255,0.42)',
+              }}
+            >
+              <span className="text-[9px] font-black tracking-widest uppercase">
+                {CATEGORY_ICONS[tab]} {tab}
+              </span>
+
+              <span
+                className="ml-1.5 text-[8px]"
+                style={{ opacity: 0.5 }}
+              >
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Lots */}
+      {filteredLots.length > 0 ? (
+        <motion.div
+          layout
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+        >
+          {filteredLots.map(lot => (
+            <LotCard
+              key={lot.id}
+              lot={lot}
+              onSelect={onSelect}
+            />
+          ))}
+        </motion.div>
+      ) : (
+        <div
+          className="rounded-xl py-16 text-center"
+          style={{
+            background: CARD_BG,
+            border: '1px solid rgba(212,175,55,0.10)',
+          }}
+        >
+          <div className="text-3xl mb-3">◇</div>
+
+          <p className="text-sm font-bold text-white/60">
+            No auction lots available
+          </p>
+
+          <p className="text-[10px] text-white/25 mt-2">
+            Auction inventory will appear here when
+            the global data feed is connected.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+ + lot.currentBid.toLocaleString()
+                : lot.publishedValueUsd && lot.publishedValueUsd > 0
+                  ? '
+            </p>
+          </div>
+
+          <div
+            className="p-3 rounded-sm"
+            style={{
+              background: 'rgba(212,175,55,0.035)',
+              border: `1px solid ${GOLD_FAINT}`,
+            }}
+          >
+            <p
+              className="text-[8px] tracking-widest font-bold uppercase"
+              style={{ color: GOLD_DIM }}
+            >
+              <Clock size={8} className="inline mr-1" />
+              TIME
+            </p>
+
+            <p
+              className="font-black text-base mt-1"
+              style={{ color: GOLD }}
+            >
+              {formatCountdown(
+                countdown.days,
+                countdown.hours,
+                countdown.minutes,
+                countdown.seconds,
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom information */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gavel
+              size={11}
+              style={{ color: GOLD_DIM }}
+            />
+
+            <span className="text-[9px] text-white/35">
+              {lot.bids > 0
+                ? `${lot.bids} bids`
+                : 'Auction data'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {lot.imageSourceUrl && (
+              <a
+                href={lot.imageSourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                SOURCE IMAGE <ExternalLink size={9} />
+              </a>
+            )}
+            {lot.sourceUrl && (
+              <a
+                href={lot.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="flex items-center gap-1 text-[8px] font-bold tracking-widest uppercase text-white/45 hover:text-white"
+              >
+                ORIGINAL SOURCE <ExternalLink size={9} />
+              </a>
+            )}
+            <motion.span
+              whileHover={{ x: 2 }}
+              className="flex items-center gap-1 text-[9px] font-black tracking-widest uppercase"
+              style={{ color: GOLD }}
+            >
+              VIEW LOT
+              <ExternalLink size={9} />
+            </motion.span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+export default function AuctionDirectory({
+  lots,
+  onSelect,
+}: AuctionDirectoryProps) {
+  const [activeTab, setActiveTab] =
+    useState<AuctionCategory>('ALL')
+    const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredLots = lots.filter(lot => {
+  const matchesCategory =
+    activeTab === 'ALL' ||
+    lot.category === activeTab
+
+  const query = searchQuery.trim().toLowerCase()
+
+  const matchesSearch = [
+    lot.title,
+    lot.subtitle,
+    lot.category,
+    lot.source,
+  ]
+    .filter(Boolean)
+    .some(value =>
+      String(value).toLowerCase().includes(query)
+    )
+
+  return matchesCategory && (!query || matchesSearch)
+})
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+          <p
+            className="text-[9px] tracking-[0.25em] font-bold uppercase mb-2"
+            style={{ color: GOLD_DIM }}
+          >
+            GLOBAL AUCTION NETWORK
+          </p>
+
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Live Auction Vaults
+          </h2>
+
+          <p className="text-xs text-white/35 mt-2 max-w-xl">
+            Curated access to rare assets across global
+            auction markets.
+          </p>
+        </div>
+
+        <div
+          className="text-[9px] font-mono tracking-widest"
+          style={{ color: GOLD_DIM }}
+        >
+          {filteredLots.length} LOTS
+        </div>
+      </div>
+
+      {/* Search */}
+<div
+  className="flex items-center gap-3 px-3.5 py-3 rounded-sm"
+  style={{
+    background: 'rgba(255,255,255,0.025)',
+    border: '1px solid rgba(212,175,55,0.14)',
+  }}
+>
+  <Search size={14} style={{ color: GOLD_DIM }} />
+
+  <input
+    type="text"
+    value={searchQuery}
+    onChange={event => setSearchQuery(event.target.value)}
+    placeholder="Search auctions, cars, watches..."
+    className="flex-1 min-w-0 bg-transparent text-xs text-white outline-none placeholder:text-white/30"
+    aria-label="Search auction lots"
+  />
+
+  {searchQuery && (
+    <button
+      type="button"
+      onClick={() => setSearchQuery('')}
+      style={{ color: GOLD_DIM }}
+      aria-label="Clear search"
+    >
+      <X size={14} />
+    </button>
+  )}
+</div>
+
+      {/* Categories */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {TABS.map(tab => {
+          const active = activeTab === tab
+
+          const count =
+            tab === 'ALL'
+              ? lots.length
+              : lots.filter(lot => lot.category === tab).length
+
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="shrink-0 px-3.5 py-2 rounded-sm transition-all"
+              style={{
+                background: active
+                  ? 'rgba(212,175,55,0.10)'
+                  : 'rgba(255,255,255,0.025)',
+                border: active
+                  ? '1px solid rgba(212,175,55,0.35)'
+                  : '1px solid rgba(255,255,255,0.07)',
+                color: active
+                  ? GOLD
+                  : 'rgba(255,255,255,0.42)',
+              }}
+            >
+              <span className="text-[9px] font-black tracking-widest uppercase">
+                {CATEGORY_ICONS[tab]} {tab}
+              </span>
+
+              <span
+                className="ml-1.5 text-[8px]"
+                style={{ opacity: 0.5 }}
+              >
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Lots */}
+      {filteredLots.length > 0 ? (
+        <motion.div
+          layout
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+        >
+          {filteredLots.map(lot => (
+            <LotCard
+              key={lot.id}
+              lot={lot}
+              onSelect={onSelect}
+            />
+          ))}
+        </motion.div>
+      ) : (
+        <div
+          className="rounded-xl py-16 text-center"
+          style={{
+            background: CARD_BG,
+            border: '1px solid rgba(212,175,55,0.10)',
+          }}
+        >
+          <div className="text-3xl mb-3">◇</div>
+
+          <p className="text-sm font-bold text-white/60">
+            No auction lots available
+          </p>
+
+          <p className="text-[10px] text-white/25 mt-2">
+            Auction inventory will appear here when
+            the global data feed is connected.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+ + lot.publishedValueUsd.toLocaleString()
+                  : '—'}
             </p>
           </div>
 
