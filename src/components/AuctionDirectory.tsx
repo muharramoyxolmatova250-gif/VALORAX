@@ -8,6 +8,7 @@ import type { AuctionCategory, AuctionLot } from '../types'
 interface AuctionDirectoryProps {
   lots: AuctionLot[]
   onSelect: (lot: AuctionLot) => void
+  onAnalyze: (lot: AuctionLot) => void
 }
 
 const TABS: AuctionCategory[] = [
@@ -59,7 +60,7 @@ function formatCountdown(days: number, hours: number, minutes: number, seconds: 
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function LotCard({ lot, onSelect }: { lot: AuctionLot; onSelect: (lot: AuctionLot) => void }) {
+function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot: AuctionLot) => void; onAnalyze: (lot: AuctionLot) => void }) {
   const countdown = useCountdown(lot.secondsLeft)
   const categoryColor = CATEGORY_COLORS[lot.category] || GOLD
   const isLive = lot.status === 'LIVE' || (!lot.status && lot.secondsLeft > 0)
@@ -164,12 +165,21 @@ function LotCard({ lot, onSelect }: { lot: AuctionLot; onSelect: (lot: AuctionLo
             VIEW LOT <ExternalLink size={9} />
           </motion.span>
         </div>
+
+        <button
+          type="button"
+          onClick={event => { event.stopPropagation(); onAnalyze(lot) }}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-[#D4AF37]/45 bg-[#D4AF37]/[.07] px-3 py-3 text-[9px] font-black tracking-[.18em] text-[#D4AF37] transition hover:bg-[#D4AF37] hover:text-black"
+          aria-label={`Analyze ${lot.title} with OMNISIGHT`}
+        >
+          <span aria-hidden="true">◇</span> ANALYZE WITH OMNISIGHT
+        </button>
       </div>
     </motion.div>
   )
 }
 
-export default function AuctionDirectory({ lots, onSelect }: AuctionDirectoryProps) {
+export default function AuctionDirectory({ lots, onSelect, onAnalyze }: AuctionDirectoryProps) {
   const [activeTab, setActiveTab] = useState<AuctionCategory>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -230,7 +240,7 @@ export default function AuctionDirectory({ lots, onSelect }: AuctionDirectoryPro
 
       {filteredLots.length > 0 ? (
         <motion.div layout className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredLots.map(lot => <LotCard key={lot.id} lot={lot} onSelect={onSelect} />)}
+          {filteredLots.map(lot => <LotCard key={lot.id} lot={lot} onSelect={onSelect} onAnalyze={onAnalyze} />)}
         </motion.div>
       ) : (
         <div className="rounded-xl py-16 text-center" style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.10)' }}>
