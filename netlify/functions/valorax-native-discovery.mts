@@ -43,8 +43,17 @@ function locations(xml: string) {
     .map(m => clean(m[1])).filter(Boolean)
 }
 function meta(html: string, key: string, value: string) {
-  const tag = new RegExp('<meta\\b(?=[^>]*' + key + '=["\\']' + value + '["\\'])[^>]*content=["\\']([^"\\']*)["\\'][^>]*>', 'i')
-  return clean(html.match(tag)?.[1] || '').slice(0, 1000)
+  const tags = html.match(/<meta\\b[^>]*>/gi) || []
+  for (const tag of tags) {
+    const attribute = (name: string) => {
+      const match = tag.match(new RegExp('\\\\b' + name + '\\\\s*=\\\\s*([\\\'\\"])(.*?)\\\\1', 'i'))
+      return match?.[2] || ''
+    }
+    if (attribute(key).toLowerCase() === value.toLowerCase()) {
+      return clean(attribute('content')).slice(0, 1000)
+    }
+  }
+  return ''
 }
 function titleOf(html: string) {
   return (meta(html, 'property', 'og:title') || clean(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '')).slice(0, 500)
