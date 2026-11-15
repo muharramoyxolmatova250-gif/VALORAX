@@ -1,4 +1,4 @@
-import { schedule } from '@netlify/functions'
+import type { Config } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 
@@ -175,11 +175,25 @@ async function run() {
   console.log('VALORAX native discovery', JSON.stringify(summary))
   return summary
 }
-export default schedule('*/15 * * * *', async () => {
+export default async (req: Request) => {
+  const payload = await req.json().catch(() => ({})) as { next_run?: string }
   if (process.env.VALORAX_NATIVE_DISCOVERY_ENABLED !== 'true') {
     console.log('VALORAX native discovery disabled pending approved sitemap sources and migration.')
-    return
+    return new Response(JSON.stringify({ ok: false, disabled: true, nextRun: payload.next_run || null }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })
   }
-  try { await run() } catch (error) { console.error('VALORAX native discovery failed', error instanceof Error ? error.message : 'UNKNOWN') }
-})
-export const config = { schedule: '*/15 * * * *' }
+  try {
+    const summary = await run()
+    return new Response(JSON.stringify({ ...summary, nextRun: payload.next_run || null }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('VALORAX native discovery failed', error instanceof Error ? error.message : 'UNKNOWN')
+    return new Response(JSON.stringify({ ok: false, error: 'DISCOVERY_FAILED' }), {
+      status: 500, headers: { 'content-type': 'application/json' },
+    })
+  }
+}
+
+export const config: Config = { schedule: '*/15 * * * *' }
