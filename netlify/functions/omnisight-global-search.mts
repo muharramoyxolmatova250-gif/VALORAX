@@ -6,20 +6,20 @@ type SearchResult = { title?: string; url?: string; content?: string; engine?: s
 type SearchPass = { assetClass: string; query: string }
 
 const PASSES: SearchPass[] = [
-  { assetClass: 'hypercar', query: 'site:*.com auction lot hypercar upcoming sale estimate' },
-  { assetClass: 'classic_car', query: 'classic car auction lot upcoming sale estimate' },
-  { assetClass: 'racing_car', query: 'historic racing car auction lot upcoming sale' },
-  { assetClass: 'watch', query: 'rare luxury watch auction lot upcoming sale estimate' },
-  { assetClass: 'fine_art', query: 'fine art painting auction lot upcoming sale estimate' },
-  { assetClass: 'sculpture', query: 'sculpture decorative art auction lot upcoming sale' },
-  { assetClass: 'jewellery', query: 'exceptional jewellery gemstone auction lot upcoming sale' },
-  { assetClass: 'coin', query: 'rare coin banknote auction lot upcoming sale' },
-  { assetClass: 'historical_artifact', query: 'historical artefact antiquities auction lot upcoming sale' },
-  { assetClass: 'collectible', query: 'rare collectible memorabilia auction lot upcoming sale' },
-  { assetClass: 'yacht', query: 'superyacht yacht auction sale listing' },
-  { assetClass: 'aircraft', query: 'private aircraft helicopter auction sale listing' },
-  { assetClass: 'real_estate', query: 'luxury estate trophy real estate auction lot upcoming sale' },
-  { assetClass: 'business', query: 'business equity company stake auction sale listing' },
+  { assetClass: 'hypercar', query: 'Pagani Bugatti Koenigsegg McLaren Ferrari hypercar auction lots upcoming sale estimate' },
+  { assetClass: 'classic_car', query: 'classic vintage collector car auction lots upcoming sale estimate catalogue' },
+  { assetClass: 'racing_car', query: 'historic racing competition car auction lots upcoming sale estimate' },
+  { assetClass: 'watch', query: 'rare luxury watch Patek Philippe Rolex Richard Mille auction lots upcoming sale estimate' },
+  { assetClass: 'fine_art', query: 'important fine art painting auction lots upcoming sale estimate catalogue' },
+  { assetClass: 'sculpture', query: 'important sculpture bronze marble auction lots upcoming sale estimate' },
+  { assetClass: 'jewellery', query: 'exceptional jewellery diamond gemstone auction lots upcoming sale estimate' },
+  { assetClass: 'coin', query: 'rare numismatic coin banknote auction lots upcoming sale estimate' },
+  { assetClass: 'historical_artifact', query: 'rare antiquities historical artefact manuscript auction lots upcoming sale' },
+  { assetClass: 'collectible', query: 'rare collectible memorabilia comic book trading card auction lots upcoming sale' },
+  { assetClass: 'yacht', query: 'luxury yacht superyacht auction sale listing broker' },
+  { assetClass: 'aircraft', query: 'private jet aircraft helicopter auction sale listing' },
+  { assetClass: 'real_estate', query: 'luxury mansion estate trophy real estate property auction lots upcoming sale' },
+  { assetClass: 'business', query: 'private business company equity stake auction sale listing' },
 ]
 
 const MAX_PER_RUN = 25
@@ -42,6 +42,10 @@ function safeResult(item: SearchResult, pass: SearchPass) {
     const snippet = typeof item.content === 'string'
       ? item.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_SNIPPET)
       : null
+    // Exclude brand homepages and general reference pages; keep only search results
+    // whose visible title/snippet contains a genuine sale or auction signal.
+    const listingText = `${title} ${snippet || ''}`
+    if (!/\b(auction|lot|estimate|bidding|catalogue|catalog|consignment|upcoming|for sale|sale)\b/i.test(listingText)) return null
     return { url: url.href, host: normalizedHost(url.hostname), title, snippet, assetClass: pass.assetClass }
   } catch {
     return null
@@ -85,6 +89,8 @@ async function runGlobalSearch() {
     url.searchParams.set('language', 'en')
     url.searchParams.set('safesearch', '1')
     url.searchParams.set('pageno', '1')
+    // Bing is the only engine confirmed responsive on this Render instance.
+    url.searchParams.set('engines', 'bing')
     const response = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: AbortSignal.timeout(18000),
@@ -96,7 +102,7 @@ async function runGlobalSearch() {
       .filter((item): item is NonNullable<typeof item> => Boolean(item))
   }
 
-  const batches = await mapLimit(PASSES, 3, async pass => {
+  const batches = await mapLimit(PASSES, 2, async pass => {
     try { return await search(pass) }
     catch (error) {
       console.error('OMNISIGHT search pass failed', pass.assetClass, error instanceof Error ? error.message : 'UNKNOWN')
@@ -111,7 +117,7 @@ async function runGlobalSearch() {
   }
   const candidates = [...unique.values()]
   if (!candidates.length) {
-    const summary = { ok: true, searchPasses: PASSES.length, candidatesFound: 0, lotsUpserted: 0, note: 'No search results passed basic URL checks.' }
+    const summary = { ok: true, searchPasses: PASSES.length, candidatesFound: 0, lotsUpserted: 0, note: 'No search results passed URL and auction-listing checks.' }
     console.log('OMNISIGHT global search', JSON.stringify(summary))
     return summary
   }
