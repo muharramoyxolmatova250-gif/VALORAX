@@ -1,3 +1,9 @@
+[[redirects]]
+  from = "/api/omnisight/analyze"
+  to = "/.netlify/functions/omnisight-analyze"
+  status = 200
+  force = true
+
 [build]
   command = "npm run build"
   publish = "dist"
