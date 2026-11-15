@@ -3,6 +3,7 @@ use_default_settings: true
 general:
   debug: false
   instance_name: "VALORAX OmniSight Search"
+  contact_url: "https://valorax.netlify.app/"
 
 search:
   safe_search: 1
