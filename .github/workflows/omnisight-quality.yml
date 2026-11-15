@@ -32,3 +32,5 @@ jobs:
         run: npx tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck --lib ES2020,DOM --types node netlify/functions/omnisight-analyze.mts netlify/functions/omnisight-discovery.mts netlify/functions/omnisight-lot-analysis.mts netlify/functions/auctions.mts netlify/functions/lib/intelligence-guard.mts netlify/functions/lib/omnisight-db.mts netlify/functions/lib/openai-response.mts
       - name: Build production frontend
         run: npm run build
+      - name: Validate Netlify build and function bundling
+        run: npx --yes netlify-cli@latest build
