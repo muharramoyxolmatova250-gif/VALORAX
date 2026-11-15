@@ -46,8 +46,8 @@ function parseCandidates(raw: string): Candidate[] {
       const url = new URL(item.url)
       if (url.protocol !== 'https:' || seen.has(url.href)) continue
       seen.add(url.href)
-      const low = Number.isFinite(Number(item.estimate_low)) ? Number(item.estimate_low) : null
-      const high = Number.isFinite(Number(item.estimate_high)) ? Number(item.estimate_high) : null
+      const low = typeof item.estimate_low === 'number' && Number.isFinite(item.estimate_low) ? item.estimate_low : null
+      const high = typeof item.estimate_high === 'number' && Number.isFinite(item.estimate_high) ? item.estimate_high : null
       result.push({
         title: item.title.slice(0, 500),
         url: url.href,
@@ -56,7 +56,7 @@ function parseCandidates(raw: string): Candidate[] {
         asset_class: typeof item.asset_class === 'string' ? item.asset_class.slice(0, 80) : 'unclassified',
         make: typeof item.make === 'string' ? item.make.slice(0, 100) : null,
         model: typeof item.model === 'string' ? item.model.slice(0, 160) : null,
-        model_year: Number.isInteger(Number(item.model_year)) ? Number(item.model_year) : null,
+        model_year: typeof item.model_year === 'number' && Number.isInteger(item.model_year) ? item.model_year : null,
         sale_date: typeof item.sale_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.sale_date) ? item.sale_date : null,
         listing_status: ALLOWED_STATUS.has(item.listing_status) ? item.listing_status : 'unknown',
         estimate_low: low !== null && low >= 0 ? low : null,
