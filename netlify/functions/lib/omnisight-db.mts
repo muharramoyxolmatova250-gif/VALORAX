@@ -153,6 +153,42 @@ export async function fetchCuratedMarketSales(db: OmnisightDb, assetName: string
   return { records: (data || []) as CuratedMarketSale[], queryState: data?.length ? 'rights_cleared_records_found' as const : 'no_rights_cleared_records' as const }
 }
 
+export async function fetchLatestOmnisightResearch(db: OmnisightDb, userId: string, assetName: string) {
+  const { data: asset, error: assetError } = await db
+    .from('omnisight_assets')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('display_name', assetName)
+    .maybeSingle()
+  if (assetError) throw new Error('OMNISIGHT_ASSET_HISTORY_LOOKUP_FAILED')
+  if (!asset) return null
+
+  const { data, error } = await db
+    .from('omnisight_analyses')
+    .select('id,model,verdict,confidence,report,citations,created_at')
+    .eq('owner_id', userId)
+    .eq('asset_id', asset.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error('OMNISIGHT_REPORT_HISTORY_LOOKUP_FAILED')
+  return data
+}
+
+export async function updateOmnisightResearchReport(
+  db: OmnisightDb,
+  userId: string,
+  analysisId: string,
+  report: Record<string, unknown>,
+) {
+  const { error } = await db
+    .from('omnisight_analyses')
+    .update({ report })
+    .eq('id', analysisId)
+    .eq('owner_id', userId)
+  if (error) throw new Error('OMNISIGHT_FULL_REPORT_SAVE_FAILED')
+}
+
 export async function persistOmnisightResearch(
   db: OmnisightDb,
   userId: string,
