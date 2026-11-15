@@ -421,6 +421,42 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
               {analysisLoading ? 'RESEARCHING...' : 'ANALYZE LATEST ASSET'}
             </button>
           </div>
+          {!analysisResult && (
+            <section className="mt-5 rounded-xl border border-[#D4AF37]/25 bg-gradient-to-br from-[#17140B] to-[#0B0B0D] p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[9px] font-bold tracking-[0.24em] text-[#D4AF37]">VALORAX PRIVATE MEMBERSHIP · OMNISIGHT</p>
+                  <h3 className="mt-1 text-lg font-black tracking-widest text-white">PRIVATE ASSET REPORT</h3>
+                  <p className="mt-1 text-[10px] text-white/40">The six-part research report appears here after an evidence-based analysis.</p>
+                </div>
+                <span className="rounded border border-[#D4AF37]/30 px-2 py-1 text-[9px] font-bold tracking-widest text-[#D4AF37]">{analysisLoading ? 'ANALYSIS IN PROGRESS' : 'AWAITING ANALYSIS'}</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  ['GOOD · SUPPORTED SIGNALS', 'Verified positive findings supported by cited evidence.', 'border-emerald-400/25', 'text-emerald-200'],
+                  ['BAD · MATERIAL CONCERNS', 'Conflicts, defects or adverse findings identified in available sources.', 'border-rose-400/25', 'text-rose-200'],
+                  ['RISKS · DUE DILIGENCE', 'Financial, legal, technical and liquidity checks that may be required.', 'border-amber-400/25', 'text-amber-200'],
+                  ['UNCERTAINTIES · NOT VERIFIED', 'Missing records, unresolved claims and evidence gaps.', 'border-white/15', 'text-white/75'],
+                ].map(([title, description, borderTone, titleTone]) => (
+                  <div key={title} className={`space-y-2 rounded-lg border ${borderTone} bg-black/25 p-3`}>
+                    <h4 className={`text-[10px] font-black tracking-[0.15em] ${titleTone}`}>{title}</h4>
+                    <p className="text-xs leading-relaxed text-white/45">{description}</p>
+                    <p className="text-[9px] font-bold tracking-widest text-white/25">AWAITING EVIDENCE ANALYSIS</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 rounded-lg border border-[#D4AF37]/20 bg-black/30 p-4">
+                <h4 className="text-[10px] font-black tracking-[0.18em] text-[#D4AF37]">MARKET ANALYSIS</h4>
+                <p className="mt-2 text-xs leading-relaxed text-white/45">Historical comparables, sold/unsold results and price ranges will appear only when rights-cleared records are available. No unsupported estimate will be shown.</p>
+                <p className="mt-2 text-[9px] font-bold tracking-widest text-white/25">AWAITING MARKET DATA</p>
+              </div>
+              <div className="mt-3 rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/[.06] p-4">
+                <p className="text-[9px] font-bold tracking-[0.2em] text-[#D4AF37]">FINAL OMNISIGHT VERDICT</p>
+                <p className="mt-2 text-xs leading-relaxed text-white/45">A GOOD, BAD or UNCERTAIN conclusion with confidence level and evidence limitations will be shown after analysis.</p>
+                <p className="mt-2 text-[9px] font-bold tracking-widest text-white/25">VERDICT NOT YET AVAILABLE</p>
+              </div>
+            </section>
+          )}
           {analysisError && <p role="alert" className="mt-3 text-xs text-red-300">{analysisError}</p>}
           {analysisResult && (
             <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
