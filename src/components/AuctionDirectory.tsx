@@ -162,12 +162,16 @@ function LotCard({
             loading="lazy"
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            style={{ filter: 'brightness(0.72) saturate(0.84)' }}
+            style={{ filter: 'brightness(0.68) saturate(0.82)' }}
             onError={event => { event.currentTarget.style.display = 'none' }}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center"
-            style={{ background: 'radial-gradient(circle at 50% 35%, rgba(212,175,55,0.14), transparent 42%), linear-gradient(145deg,#171719,#080809)' }}>
+          <div
+            className="w-full h-full flex flex-col items-center justify-center"
+            style={{
+              background: 'radial-gradient(circle at 50% 35%, rgba(212,175,55,0.14), transparent 42%), linear-gradient(145deg,#171719,#080809)',
+            }}
+          >
             <span className="text-5xl" style={{ color: 'rgba(212,175,55,0.55)' }}>◇</span>
             <span className="mt-3 text-[8px] tracking-[0.28em] font-bold" style={{ color: 'rgba(212,175,55,0.45)' }}>VALORAX PRIVATE VAULT</span>
           </div>
@@ -272,7 +276,11 @@ function LotCard({
               className="text-[8px] tracking-widest font-bold uppercase"
               style={{ color: GOLD_DIM }}
             >
-              {lot.currentBid > 0 ? 'CURRENT BID' : lot.publishedValueUsd && lot.publishedValueUsd > 0 ? 'PUBLISHED VALUE' : 'CURRENT BID'}
+              {lot.currentBid > 0
+                ? 'CURRENT BID'
+                : lot.publishedValueUsd && lot.publishedValueUsd > 0
+                  ? 'PUBLISHED VALUE'
+                  : 'CURRENT BID'}
             </p>
 
             <p
@@ -303,12 +311,14 @@ function LotCard({
               className="font-black text-base mt-1"
               style={{ color: GOLD }}
             >
-              {lot.secondsLeft > 0 ? formatCountdown(
-                countdown.days,
-                countdown.hours,
-                countdown.minutes,
-                countdown.seconds,
-              ) : '—'}
+              {lot.secondsLeft > 0
+                ? formatCountdown(
+                    countdown.days,
+                    countdown.hours,
+                    countdown.minutes,
+                    countdown.seconds,
+                  )
+                : '—'}
             </p>
           </div>
         </div>
