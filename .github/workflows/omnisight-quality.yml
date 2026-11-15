@@ -33,4 +33,4 @@ jobs:
       - name: Build production frontend
         run: npm run build
       - name: Validate Netlify build and function bundling
-        run: npx --yes netlify-cli@latest build
+        run: npx --yes netlify-cli@latest build --offline
