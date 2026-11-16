@@ -47,7 +47,7 @@ async function getSourceId(host) {
  let {data,error}=await db.from('omnisight_lot_sources').select('id').eq('domain',host).maybeSingle()
  if(error) throw new Error('SOURCE_LOOKUP_FAILED')
  if(!data) {
-  const inserted=await db.from('omnisight_lot_sources').insert({domain:host,display_name:host,source_type:'web_search_discovery',access_method:'search_index',access_status:'pending_review',terms_status:'unknown',automated_access_allowed:false,enabled:false,crawl_delay_ms:1000,max_requests_per_hour:0}).select('id').single()
+  const inserted=await db.from('omnisight_lot_sources').insert({domain:host,display_name:host,source_type:'other',access_method:'permitted_public_catalogue',access_status:'pending_review',terms_status:'unknown',automated_access_allowed:false,enabled:false,crawl_delay_ms:1000,max_requests_per_hour:1}).select('id').single()
   if(inserted.error||!inserted.data) {
    const retry=await db.from('omnisight_lot_sources').select('id').eq('domain',host).maybeSingle()
    if(retry.error||!retry.data) throw new Error('SOURCE_REGISTER_FAILED')
