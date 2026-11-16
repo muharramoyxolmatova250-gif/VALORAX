@@ -1,0 +1,1 @@
+{"name":"valorax-omnisight-worker","private":true,"type":"module","scripts":{"start":"node index.mjs"},"dependencies":{"@supabase/supabase-js":"^2.116.0","bullmq":"^5.58.5"}}
