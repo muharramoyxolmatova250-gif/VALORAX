@@ -91,8 +91,8 @@ async function scheduleBatch() {
  if(scheduling)return
  scheduling=true
  try {
-  const minute=Math.floor(Date.now()/60000)
-  for(const pass of passes) await searchQueue.add('search-pass',{pass},{jobId:'search_'+minute+'_'+pass[0],removeOnComplete:true,removeOnFail:500,attempts:2,backoff:{type:'exponential',delay:5000}})
+  const batch=Math.floor(Date.now()/300000)
+  for(const pass of passes) await searchQueue.add('search-pass',{pass},{jobId:'search_'+batch+'_'+pass[0],removeOnComplete:true,removeOnFail:500,attempts:2,backoff:{type:'exponential',delay:5000}})
   const count=await candidateQueue.client.then(c=>c.get('valorax:omnisight:raw:'+new Date().toISOString().slice(0,10)))
   console.log(JSON.stringify({event:'search_batch_queued',passes:passes.length,dailyRawResultsProcessed:Number(count||0),dailyTarget,searchConcurrency,candidateConcurrency}))
  } catch(e) { console.error('SEARCH_SCHEDULER_ERROR',e instanceof Error?e.message:'UNKNOWN') }
@@ -102,9 +102,9 @@ searchWorker.on('failed',(j,e)=>console.error('SEARCH_JOB_FAILED',j?.id,e.messag
 candidateWorker.on('failed',(j,e)=>console.error('CANDIDATE_JOB_FAILED',j?.id,e.message))
 searchWorker.on('error',e=>console.error('SEARCH_WORKER_ERROR',e.message))
 candidateWorker.on('error',e=>console.error('CANDIDATE_WORKER_ERROR',e.message))
-console.log(JSON.stringify({event:'omnisight_worker_started',targetDailyRawResults:dailyTarget,searchPassesPerMinute:passes.length,searchConcurrency,candidateConcurrency,mode:'discovery_candidates_only_no_unapproved_source_scraping'}))
+console.log(JSON.stringify({event:'omnisight_worker_started',targetDailyRawResults:dailyTarget,searchPassesPerBatch:passes.length,searchConcurrency,candidateConcurrency,mode:'discovery_candidates_only_no_unapproved_source_scraping'}))
 await scheduleBatch()
-const timer=setInterval(scheduleBatch,60000)
+const timer=setInterval(scheduleBatch,300000)
 async function shutdown(signal) {
  console.log('OMNISIGHT_SHUTDOWN',signal);clearInterval(timer)
  await Promise.all([searchWorker.close(),candidateWorker.close(),searchQueue.close(),candidateQueue.close()])
