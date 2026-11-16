@@ -1,0 +1,29 @@
+services:
+  - type: worker
+    name: valorax-omnisight-worker
+    runtime: node
+    region: singapore
+    plan: 0.5c-512mb
+    rootDir: workers/omnisight
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 120
+    envVars:
+      - key: SUPABASE_URL
+        value: https://rokrbppnohafumsueicg.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SEARXNG_BASE_URL
+        value: https://valorax-searxng.onrender.com
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: valorax-searxng-valkey
+          property: connectionString
+      - key: OMNISIGHT_TARGET_DAILY_RAW
+        value: "100000"
+      - key: SEARCH_CONCURRENCY
+        value: "3"
+      - key: WORKER_CONCURRENCY
+        value: "10"
