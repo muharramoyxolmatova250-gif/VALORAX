@@ -7,23 +7,23 @@ const SEARXNG_BASE_URL = "https://valorax-searxng.onrender.com";
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const PASSES = [
-  ["hypercar", "site:rmsothebys.com OR site:bonhams.com OR site:goodingco.com hypercar auction lot upcoming"],
-  ["classic_car", "classic car auction lot upcoming live estimate"],
-  ["racing_car", "historic racing car auction lot upcoming estimate"],
-  ["watch", "rare luxury watch auction lot upcoming estimate"],
-  ["fine_art", "fine art painting auction lot upcoming estimate"],
-  ["sculpture", "rare sculpture auction lot upcoming estimate"],
-  ["jewellery", "exceptional jewellery gemstone auction lot estimate"],
-  ["coin", "rare coin banknote auction lot estimate"],
-  ["historical_artifact", "historical artifact antiquities auction lot upcoming"],
-  ["collectible", "rare collectible memorabilia auction lot estimate"],
-  ["yacht", "superyacht yacht auction listing asking price"],
-  ["aircraft", "private aircraft helicopter auction listing price"],
-  ["real_estate", "luxury estate trophy real estate auction listing"],
-  ["business", "business equity company stake auction listing"]
+  ["hypercar", "hypercar auction lot upcoming bidding estimate"],
+  ["classic_car", "classic car auction lot upcoming sale estimate"],
+  ["racing_car", "historic racing car auction lot upcoming sale estimate"],
+  ["watch", "rare luxury watch auction lot upcoming sale estimate"],
+  ["fine_art", "fine art painting auction lot upcoming sale estimate"],
+  ["sculpture", "important sculpture auction lot upcoming sale estimate"],
+  ["jewellery", "important diamond jewellery auction lot upcoming sale estimate"],
+  ["coin", "rare coin auction lot upcoming sale estimate"],
+  ["historical_artifact", "important antiquity historical artifact auction lot upcoming sale estimate"],
+  ["collectible", "important collectible memorabilia auction lot upcoming sale estimate"],
+  ["yacht", "superyacht auction lot sale estimate"],
+  ["aircraft", "private jet aircraft auction lot sale estimate"],
+  ["real_estate", "trophy estate property auction lot sale estimate"],
+  ["business", "business equity auction lot valuation sale"]
 ] as const;
 
-const MAX_PAGES = 3;
+const MAX_PAGES = 5;
 const MAX_RESULTS_PER_PAGE = 10;
 const USER_AGENT = "VALORAX-OmniSight/1.1 (+https://valorax.netlify.app)";
 const PRIVATE_HOSTS = new Set(["localhost", "localhost.localdomain", "metadata.google.internal"]);
@@ -79,7 +79,58 @@ function jsonLd(html: string) {
   }
   return found;
 }
-function parsePage(html: string, fallback: string) {
+
+function extractUsdLotValue(html: string): number | null {
+  const text = cleanText(html, 250000);
+  const patterns = [
+    /(?:estimate(?:d)?(?:\s+(?:at|between|from))?|asking\s+price|starting\s+bid|current\s+bid|reserve(?:\s+price)?|valuation|price)\D{0,100}\$\s*([\d,]+(?:\.\d+)?)\s*(million|mn|m|thousand|k)?\b/ig,
+    /(?:estimate(?:d)?(?:\s+(?:at|between|from))?|asking\s+price|starting\s+bid|current\s+bid|reserve(?:\s+price)?|valuation|price)\D{0,100}USD\s*([\d,]+(?:\.\d+)?)\s*(million|mn|m|thousand|k)?\b/ig
+  ];
+  for (const re of patterns) {
+    for (const match of text.matchAll(re)) {
+      const base = Number(match[1].replace(/,/g, ""));
+      const unit = (match[2] || "").toLowerCase();
+      const value = base * (["million", "mn", "m"].includes(unit) ? 1_000_000 : ["thousand", "k"].includes(unit) ? 1_000 : 1);
+      if (Number.isFinite(value) && value >= 500000 && value < 1e12) return value;
+    }
+  }
+  return null;
+}
+function has500kUsdEvidence(text: string) {
+  return extractUsdLotValue(text) !== null;
+}
+
+function classifyLotAssetClass(title: string, summary: string, fallback: string) {
+  const text = (title + " " + summary).toLowerCase();
+  if (/\b(patek philippe|rolex|wristwatch|watch|timepiece|nautilus)\b/.test(text)) return "watch";
+  if (/\b(coin|sovereign|numismatic|guinea|doubloon)\b/.test(text)) return "coin";
+  if (/\b(yacht|superyacht|motor yacht)\b/.test(text)) return "yacht";
+  if (/\b(private jet|aircraft|helicopter|cessna|gulfstream|falcon 7x)\b/.test(text)) return "aircraft";
+  if (/\b(diamond|jewellery|jewelry|necklace|bracelet|gemstone)\b/.test(text)) return "jewellery";
+  if (/\b(sculpture|bronze statue|marble statue|bust|carved marble)\b/.test(text)) return "sculpture";
+  if (/\b(painting|lithograph|oil on canvas|watercolour|watercolor|etching|canvas)\b/.test(text)) return "fine_art";
+  if (/\b(book|hardcover|paperback|first edition|printed volume)\b/.test(text)) return "collectible";
+  if (/\b(ferrari|mclaren|bugatti|pagani|koenigsegg|porsche 911 gt|lamborghini)\b/.test(text)) return "hypercar";
+  if (/\b(racing car|formula 1|le mans|race car|racing automobile)\b/.test(text)) return "racing_car";
+  if (/\b(bentley|morgan|jaguar|aston martin|classic car|rolls-royce|mercedes-benz|chassis|registration number)\b/.test(text)) return "classic_car";
+  const fallbackEvidence: Record<string, RegExp> = {
+    hypercar: /\b(hypercar|supercar|ferrari|mclaren|bugatti|pagani|koenigsegg|lamborghini)\b/,
+    classic_car: /\b(car|automobile|vehicle|bentley|morgan|jaguar|aston martin|rolls-royce|mercedes)\b/,
+    racing_car: /\b(racing|race car|formula 1|le mans|motorsport)\b/,
+    watch: /\b(watch|wristwatch|timepiece|patek|rolex|omega)\b/,
+    fine_art: /\b(art|painting|artist|canvas|lithograph|etching)\b/,
+    sculpture: /\b(sculpture|statue|bust|marble|bronze)\b/,
+    jewellery: /\b(jewellery|jewelry|diamond|ring|necklace|bracelet|gemstone)\b/,
+    coin: /\b(coin|numismatic|sovereign|guinea|doubloon)\b/,
+    historical_artifact: /\b(antiquit|artifact|artefact|historical|manuscript|relic)\b/,
+    collectible: /\b(collectible|memorabilia|book|poster|signed|memorandum)\b/,
+    yacht: /\b(yacht|vessel|boat|superyacht)\b/,
+    aircraft: /\b(aircraft|plane|jet|helicopter|cessna|gulfstream)\b/,
+    real_estate: /\b(property|estate|land|house|villa|building|real estate)\b/,
+    business: /\b(business|company|equity|shares|enterprise)\b/
+  };
+  return fallbackEvidence[fallback]?.test(text) ? fallback : "unclassified";
+}function parsePage(html: string, fallback: string, pageUrl: URL) {
   const nodes = jsonLd(html);
   const node = nodes.find(n => /Product|Vehicle|IndividualProduct|Event/i.test(String(n["@type"] || ""))) || nodes[0] || {};
   const title = cleanText(meta(html, ["og:title", "twitter:title"]) || node.name || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "") || fallback, 500);
@@ -89,35 +140,93 @@ function parsePage(html: string, fallback: string) {
   const priceRaw = offer.price ?? node.price ?? meta(html, ["product:price:amount"]);
   const price = typeof priceRaw === "number" ? priceRaw : (typeof priceRaw === "string" && /^\d+(\.\d+)?$/.test(priceRaw.replace(/,/g, "")) ? Number(priceRaw.replace(/,/g, "")) : null);
   const currency = cleanText(offer.priceCurrency || meta(html, ["product:price:currency"]), 3).toUpperCase();
+  const visibleUsdValue = extractUsdLotValue(html);
   const availability = cleanText(offer.availability || "", 100);
+  const rawImages: string[] = [];
+  const metaImage = meta(html, ["og:image", "og:image:url", "twitter:image", "twitter:image:src"]);
+  if (metaImage) rawImages.push(metaImage);
+  const nodeImage = typeof node.image === "string" ? [node.image] : Array.isArray(node.image) ? node.image.map((v: unknown) => typeof v === "string" ? v : v && typeof v === "object" ? String((v as Record<string, unknown>).url || "") : "") : node.image && typeof node.image === "object" ? [String((node.image as Record<string, unknown>).url || "")] : [];
+  rawImages.push(...nodeImage);
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const a = attrs(m[0]);
+    const candidate = a.src || a["data-src"] || a["data-original"] || (a.srcset ? a.srcset.split(",")[0].trim().split(/\s+/)[0] : "");
+    if (candidate) rawImages.push(candidate);
+  }
+  const imageUrls: string[] = [];
+  for (const raw of rawImages) {
+    try {
+      const candidate = new URL(String(raw || ""), pageUrl);
+      const path = candidate.pathname.toLowerCase();
+      if (candidate.protocol !== "https:" || !candidate.hostname.includes(".") || candidate.username || candidate.password) continue;
+      if (candidate.href === pageUrl.href) continue;
+      if (["logo", "icon", "avatar", "sprite", "placeholder", "tracking"].some(term => path.includes(term))) continue;
+      if (path.endsWith(".svg") || path.endsWith(".gif")) continue;
+      if (!imageUrls.includes(candidate.href)) imageUrls.push(candidate.href);
+    } catch { /* ignore invalid image URL */ }
+    if (imageUrls.length >= 8) break;
+  }
   const result: Record<string, unknown> = {};
   if (title) result.title = title;
+  if (imageUrls.length) result.image_urls = imageUrls;
   if (description) result.short_factual_summary = description;
   if (sku) result.lot_number = sku;
-  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12 && /^[A-Z]{3}$/.test(currency)) {
-    result.currency = currency;
+  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12) {
+    if (/^[A-Z]{3}$/.test(currency)) result.currency = currency;
     if (currency === "USD") {
       result.published_value_usd = price;
-      result.value_basis = "source_page_observed_price";
+      result.value_basis = "asking_price";
     }
   }
-  const startRaw = node.startDate || node.startDateTime || node.auctionStartDate;
-  const endRaw = node.endDate || node.endDateTime || node.auctionEndDate;
-  const start = typeof startRaw === "string" ? new Date(startRaw) : null;
-  const end = typeof endRaw === "string" ? new Date(endRaw) : null;
-  if (start && Number.isFinite(start.getTime())) result.auction_starts_at = start.toISOString();
-  if (end && Number.isFinite(end.getTime())) result.auction_ends_at = end.toISOString();
-  const organizer = (node.organizer && typeof node.organizer === "object" ? node.organizer : {}) as Record<string, unknown>;
-  const seller = (node.seller && typeof node.seller === "object" ? node.seller : {}) as Record<string, unknown>;
-  const auctionHouse = cleanText(organizer.name || seller.name, 200);
-  if (auctionHouse) result.auction_house = auctionHouse;
-  if (/soldout|outofstock/i.test(availability)) result.listing_status = "closed";
-  else if (start && Number.isFinite(start.getTime()) && start.getTime() > Date.now()) result.listing_status = "upcoming";
-  else if (end && Number.isFinite(end.getTime()) && end.getTime() < Date.now()) result.listing_status = "closed";
+  if (visibleUsdValue !== null && (currency === "USD" || /\$/.test(cleanText(html, 250000)))) {
+    result.published_value_usd = visibleUsdValue;
+    result.value_basis = "estimate_or_asking_price";
+  }
+  if (/soldout|outofstock/i.test(availability)) result.listing_status = "sold";
   else if (/instock|limitedavailability/i.test(availability)) result.listing_status = "active";
-  else if (start && Number.isFinite(start.getTime())) result.listing_status = "active";
   return result;
 }
+
+async function searchLotImages(title: string, lotUrl: URL, expectedHost: string): Promise<string[]> {
+  // Search the open web like a normal visual search: exact artwork/lot title,
+  // not only images hosted on the auction house's own domain.
+  const query = new URL("/search", SEARXNG_BASE_URL);
+  query.searchParams.set("q", '"' + title.slice(0, 140).replace(/["']/g, " ") + '" auction artwork');
+  query.searchParams.set("format", "json");
+  query.searchParams.set("categories", "images");
+  query.searchParams.set("language", "en");
+  query.searchParams.set("safesearch", "1");
+  query.searchParams.set("engines", "yandex,bing");
+  const response = await fetch(query, {
+    headers: { "User-Agent": USER_AGENT, "Accept": "application/json" },
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!response.ok) return [];
+  const payload = await response.json();
+  const images: string[] = [];
+  const normalize = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+  const titleNorm = normalize(title);
+  const titleTokens = titleNorm.split(/\s+/).filter(t => t.length > 2 && !["the","and","with","from","pour","les","des"].includes(t));
+  for (const raw of (Array.isArray(payload.results) ? payload.results : []).slice(0, 30)) {
+    const hit = raw as Record<string, unknown>;
+    const evidence = normalize([hit.title, hit.content, hit.source, hit.url].filter(Boolean).join(" "));
+    const matched = titleTokens.filter(token => evidence.includes(token)).length;
+    // Require a meaningful title match so unrelated auction pictures are not attached.
+    if (!evidence.includes(titleNorm) && matched < Math.max(2, Math.ceil(titleTokens.length * 0.6))) continue;
+    const rawImage = typeof hit.img_src === "string" ? hit.img_src
+      : typeof hit.thumbnail_src === "string" ? hit.thumbnail_src
+      : "";
+    try {
+      const image = new URL(rawImage, lotUrl);
+      if (image.protocol !== "https:" || !image.hostname.includes(".") || image.username || image.password) continue;
+      if (["localhost", "metadata.google.internal"].includes(image.hostname.toLowerCase())) continue;
+      if (/\.(svg|gif)(?:$|\?)/i.test(image.href)) continue;
+      if (!images.includes(image.href)) images.push(image.href);
+    } catch { /* ignore malformed image results */ }
+    if (images.length >= 4) break;
+  }
+  return images;
+}
+
 async function robotsAllows(url: URL) {
   const robotsUrl = new URL("/robots.txt", url.origin);
   const response = await fetch(robotsUrl, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(5000), redirect: "error" });
@@ -140,15 +249,14 @@ async function robotsAllows(url: URL) {
   }
   return !disallows.some(path => url.pathname.startsWith(path));
 }
-async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fallback: string, sourceFetchAt: Map<string, number>) {
+async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fallback: string) {
   if (source.enabled !== true || source.automated_access_allowed !== true || source.access_status !== "approved" || !["permitted", "licensed", "permission_granted"].includes(String(source.terms_status))) {
     return { checked: false, reason: "SOURCE_NOT_APPROVED", patch: {} };
   }
   if (!await robotsAllows(url)) return { checked: false, reason: "ROBOTS_DISALLOW_OR_UNAVAILABLE", patch: {} };
   const delay = Math.max(1000, Number(source.crawl_delay_ms || 1000));
-  const last = sourceFetchAt.get(url.hostname) || 0;
-  if (Date.now() - last < delay) return { checked: false, reason: "SOURCE_CRAWL_DELAY", patch: {} };
-  sourceFetchAt.set(url.hostname, Date.now());
+  const last = source.last_checked_at ? new Date(String(source.last_checked_at)).getTime() : 0;
+  if (last && Date.now() - last < delay) return { checked: false, reason: "SOURCE_CRAWL_DELAY", patch: {} };
   const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml;q=0.9" }, signal: AbortSignal.timeout(10000), redirect: "follow" });
   const finalUrl = new URL(response.url || url.href);
   if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) return { checked: false, reason: "LOT_PAGE_FETCH_FAILED", patch: {} };
@@ -165,12 +273,14 @@ async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fa
   }
   const bytes = new Uint8Array(total); let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  const patch = parsePage(new TextDecoder().decode(bytes), fallback);
-  if (patch.currency === "USD" && typeof patch.realised_price === "number" && patch.realised_price >= 500000) {
-    patch.published_value_usd = patch.realised_price;
-    patch.value_basis = "source_page_observed_price";
-    patch.value_source_url = url.href;
-    patch.value_checked_at = new Date().toISOString();
+  const patch = parsePage(new TextDecoder().decode(bytes), fallback, finalUrl);
+  const imageRights = String(source.image_rights_status || "unknown");
+  if (Array.isArray(patch.image_urls) && patch.image_urls.length) {
+    patch.image_usage_status = imageRights === "licensed" ? "licensed" : imageRights === "permission_granted" ? "permission_granted" : "restricted";
+    if (["licensed", "permission_granted"].includes(imageRights) && source.image_rights_reference && source.image_rights_reviewed_at) {
+      patch.hero_image_url = patch.image_urls[0];
+      patch.image_rights_reference = source.image_rights_reference;
+    }
   }
   return { checked: Object.keys(patch).length > 0, reason: "PAGE_READ", patch };
 }
@@ -184,19 +294,89 @@ Deno.serve(async (req: Request) => {
   const { data: allowed, error: authError } = await db.rpc("omnisight_authorize_worker", { p_token: token });
   if (authError || allowed !== true) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
-  const minute = Math.floor(Date.now() / 60000);
-  const batchSize = 3;
-  const selected = Array.from({length: batchSize}, (_, i) => PASSES[(minute * batchSize + i) % PASSES.length]);
-  let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0;
+  const isWorker = body?.mode === "worker";
+  if (!isWorker) {
+    const { data: activeJobs, error: activeError } = await db.from("omnisight_search_jobs")
+      .select("id,status,attempts")
+      .in("status", ["queued", "running", "failed"])
+      .limit(100);
+    if (activeError) throw activeError;
+    const hasWork = (activeJobs || []).some((job: Record<string, unknown>) =>
+      job.status === "queued" || job.status === "running" ||
+      (job.status === "failed" && Number(job.attempts || 0) < 5)
+    );
+    let enqueued = 0;
+    let batchId: string | null = null;
+    if (!hasWork) {
+      batchId = crypto.randomUUID();
+      const { data, error } = await db.rpc("omnisight_enqueue_search_batch", {
+        p_batch_id: batchId,
+        p_jobs: PASSES.map(([asset_class, query]) => ({ asset_class, query }))
+      });
+      if (error) throw error;
+      enqueued = Number(data || 0);
+    }
+
+    const workerCount = 6;
+    const endpoint = (SUPABASE_URL.endsWith("/") ? SUPABASE_URL.slice(0, -1) : SUPABASE_URL) + "/functions/v1/omnisight-discovery";
+    const workerRuns = await Promise.allSettled(Array.from({ length: workerCount }, async (_, index) => {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + SERVICE_ROLE,
+          "Content-Type": "application/json",
+          "x-omnisight-cron-secret": token
+        },
+        body: JSON.stringify({ mode: "worker", workerId: "omnisight-" + index + "-" + crypto.randomUUID() }),
+        signal: AbortSignal.timeout(150000)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error("WORKER_HTTP_" + response.status);
+      return payload;
+    }));
+    const workerResults = workerRuns.map((result) => result.status === "fulfilled"
+      ? result.value
+      : { ok: false, error: result.reason instanceof Error ? result.reason.message : "WORKER_FAILED" });
+    const { data: publishedCount, error: publishError } = await db.rpc("omnisight_publish_eligible_lots");
+    if (publishError) throw publishError;
+    const { data: remainingJobs, error: remainingError } = await db.from("omnisight_search_jobs")
+      .select("id,status,attempts")
+      .in("status", ["queued", "running", "failed"])
+      .limit(100);
+    if (remainingError) throw remainingError;
+    const remaining = (remainingJobs || []).filter((job: Record<string, unknown>) =>
+      job.status === "queued" || job.status === "running" ||
+      (job.status === "failed" && Number(job.attempts || 0) < 5)
+    ).length;
+    return Response.json({
+      ok: true, mode: "parallel_search_queue", batchId, enqueued,
+      workersStarted: workerCount,
+      workersSucceeded: workerResults.filter((r: Record<string, unknown>) => r.ok === true).length,
+      workerResults, remainingJobs: remaining, publishedCount: publishedCount ?? 0,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  const workerId = typeof body?.workerId === "string" ? body.workerId.slice(0, 120) : "omnisight-worker";
+  const { data: claimedJobs, error: claimError } = await db.rpc("omnisight_claim_search_job", { p_worker_id: workerId });
+  if (claimError) throw claimError;
+  const claimedJob = Array.isArray(claimedJobs) ? claimedJobs[0] : null;
+  if (!claimedJob) return Response.json({ ok: true, worker: workerId, idle: true });
+
+
+  try {
+  const selected = [[claimedJob.asset_class, claimedJob.query] as const];
+  let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0, imageSearches = 0, imageResultsFound = 0;
   const pageErrors: string[] = [];
   const queryStats: Array<Record<string, unknown>> = [];
-  const sourceFetchAt = new Map<string, number>();
+  const rejectionSamples: Array<Record<string, unknown>> = [];
   const runQuery = async ([assetClass, query]: readonly [string, string]) => {
     let qRaw = 0, qPages = 0, qFailed = 0, qStored = 0, qDuplicates = 0, qSkipped = 0, qEnriched = 0;
     const errors: string[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const searchUrl = new URL("/search", SEARXNG_BASE_URL);
-      searchUrl.searchParams.set("q", query);
+      const valueQualifiedQuery = query;
+      searchUrl.searchParams.set("q", valueQualifiedQuery);
       searchUrl.searchParams.set("format", "json");
       searchUrl.searchParams.set("language", "en");
       searchUrl.searchParams.set("safesearch", "1");
@@ -223,10 +403,49 @@ Deno.serve(async (req: Request) => {
         const url = safeListingUrl((hit as Record<string, unknown>)?.url);
         const title = cleanText((hit as Record<string, unknown>)?.title, 500);
         if (!url || !title) { qSkipped++; continue; }
-        const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
+        const summary = cleanText((hit as Record<string, unknown>)?.content, 1200);
+        const searchText = (title + " " + summary + " " + url.href).toLowerCase();
+        const path = url.pathname.toLowerCase();
+        // Auction houses use different canonical lot URL patterns. Sotheby's uses
+        // /en/buy/auction/{year}/{sale-slug}/{lot-slug}, not /lot(s)/.
+        const sothebysLotPath = host === "sothebys.com" && /\/en\/buy\/auction\/\d{4}\/[^/]+\/[^/]+\/?$/.test(path);
+        const detailPath = sothebysLotPath || path.includes("/lots/") || path.includes("/lot/")
+          || /\/auctions?\/[^/]+\/lots?\/[^/]+/.test(path);
+        const numberedCatalogTitle = sothebysLotPath && /^\s*\d{1,5}[.]\s+/.test(title);
+        const explicitLotRecordPath = /\/(?:lots?|lot-details?|lotdetail|items?|objects?|artworks?|catalogue|catalog|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path)
+          || sothebysLotPath;
+        const pathParts = path.split("/").filter(Boolean);
+        const excludedPath = !sothebysLotPath && /\/(?:search|results|category|categories|departments?|collections?|artists?|auction-calendar|calendar|about|contact|news|blog|events?|buy|sell|login|register|account|help|terms|privacy|tag|tags|page|pages)(?:\/|$)/i.test(path);
+        // Only accept a real lot-detail URL, not an arbitrary product/article page.
+        const strictLotPath = sothebysLotPath
+          || /\/(?:lots?|lot-details?|lotdetail|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path);
+        const titleHasLotIdentity = numberedCatalogTitle
+          || /\b(lot\s*(?:no\.?|number|#)?\s*[:#-]?\s*[a-z0-9-]+|catalogue number|item number)\b/i.test(title)
+          || /\b(lot\s+(?:no\.?|number|#)?|lot\s*#)\b/i.test(title);
+        const hasAuctionEvidence = /\b(auction|bidding|bid|estimate|hammer price|auction house|auctioneer)\b/i.test(title + " " + summary);
+        const closedEvidence = /\b(sold|realized|realised|past auction|auction results|lot results|ended|closed bidding|archived)\b/i.test(title + " " + summary);
+        const openEvidence = /\b(open for bidding|bidding (?:is )?open|bidding now|bid now|current bid|live bidding|upcoming auction|register to bid|accepting bids|auction starts|auction ends|ends in|closes? (?:today|tomorrow|in))\b/i.test(title + " " + summary);
+        const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
+          || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
+        const genericLotTitle = /^(view auction lots?|auction lots?|lots?|catalogue|catalog|results|online auction|browse lots?|link to .+|click here|view lot)$/i.test(title.trim());
+        const categoryLandingPath = (host === "hibid.com" || host.endsWith(".hibid.com")) && /^\/(?:[^/]+\/)?lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
+        const plausibleItem = strictLotPath && !excludedPath && !categoryLandingPath
+          && title.length >= 12 && !genericLotTitle && !editorialPage;
+        const highValueEvidence = has500kUsdEvidence(title + " " + summary);
+        // Do not store generic search hits: require a specific lot URL, explicit USD 500k+ evidence,
+        // and positive evidence that bidding is currently open or the sale is upcoming.
+        if (!plausibleItem || closedEvidence) {
+          qSkipped++;
+          if (rejectionSamples.length < 25) rejectionSamples.push({
+            title, url: url.href, path, plausibleItem, titleHasLotIdentity,
+            hasAuctionEvidence, closedEvidence, editorialPage, highValueEvidence, summary: summary.slice(0, 180)
+          });
+          continue;
+        }
         const hash = await sha256(url.href);
         let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
-          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at")
+          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
           .eq("domain", host).maybeSingle();
         if (sourceReadError) throw sourceReadError;
         if (!source) {
@@ -234,53 +453,68 @@ Deno.serve(async (req: Request) => {
             domain: host, display_name: host, source_type: "other", access_method: "manual_import",
             access_status: "pending_review", terms_status: "unknown", automated_access_allowed: false,
             enabled: false, crawl_delay_ms: 5000, max_requests_per_hour: 1
-          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,crawl_delay_ms,max_requests_per_hour").single();
+          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").single();
           if (inserted.error) {
-            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,crawl_delay_ms,max_requests_per_hour").eq("domain", host).maybeSingle();
+            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").eq("domain", host).maybeSingle();
             if (retry.error || !retry.data) throw inserted.error;
             source = retry.data;
           } else source = inserted.data;
         }
-        const summary = cleanText((hit as Record<string, unknown>)?.content, 1200);
-        const searchText = (title + " " + summary + " " + url.href).toLowerCase();
-        const lotSignals = ["auction", "lot", "bidding", "bid", "estimate", "hammer price", "sale results", "upcoming sale", "consignment", "catalogue", "catalog"].some(term => searchText.includes(term))
-          || ["/lot/", "/lots/", "/auction/", "/auctions/"].some(part => url.pathname.toLowerCase().includes(part));
-        if (!lotSignals) { qSkipped++; continue; }
+        if (!source) { qSkipped++; continue; }
         let pagePatch: Record<string, unknown> = {};
         let pageVerified = false;
         if (source?.enabled === true && source?.automated_access_allowed === true && source?.access_status === "approved" && ["permitted", "licensed", "permission_granted"].includes(String(source?.terms_status))) {
           try {
-            const checked = await readApprovedLotPage(url, source as Record<string, unknown>, title, sourceFetchAt);
+            const checked = await readApprovedLotPage(url, source as Record<string, unknown>, title);
             pagePatch = checked.patch;
             pageVerified = checked.checked;
           } catch { /* retry source verification on later pass */ }
         }
-        const now = new Date().toISOString();
-        const { data: existingByUrl, error: duplicateLookupError } = await db.from("omnisight_discovered_lots")
-          .select("id").eq("canonical_url", url.href).limit(1).maybeSingle();
-        if (duplicateLookupError) throw duplicateLookupError;
-        if (existingByUrl?.id) {
-          const { error: touchError } = await db.from("omnisight_discovered_lots")
-            .update({ last_seen_at: now, updated_at: now }).eq("id", existingByUrl.id);
-          if (touchError) throw touchError;
-          qDuplicates++;
-          continue;
+        let foundImages = Array.isArray(pagePatch.image_urls) ? [...pagePatch.image_urls] as string[] : [];
+        if (foundImages.length === 0 && imageSearches < 20) {
+          imageSearches++;
+          try {
+            foundImages = await searchLotImages(String(pagePatch.title || title), url, host);
+            imageResultsFound += foundImages.length;
+          } catch { /* image search is retried on the next discovery pass */ }
         }
+        const now = new Date().toISOString();
         const row = {
           source_id: source.id, source_lot_key: hash, canonical_url: url.href, title: String(pagePatch.title || title),
-          asset_class: assetClass, listing_status: pagePatch.listing_status || "unknown",
+          asset_class: classifyLotAssetClass(title, summary + " " + path, assetClass), listing_status: pagePatch.listing_status || (openEvidence ? (/upcoming auction|auction starts/i.test(searchText) ? "upcoming" : "active") : "unknown"),
           short_factual_summary: pagePatch.short_factual_summary || summary || null,
           source_title: host, source_record_hash: hash,
           verification_status: pageVerified ? "source_checked" : "candidate",
           data_use_status: "review_required", first_seen_at: now, last_seen_at: now,
-          image_urls: [], hero_image_url: null, image_usage_status: "link_only",
-          ...pagePatch
+          ...pagePatch,
+          image_urls: foundImages,
+          hero_image_url: pagePatch.hero_image_url || null,
+          image_usage_status: pagePatch.image_usage_status || "link_only",
+          ...(pagePatch.published_value_usd ? { value_source_url: url.href, value_checked_at: now } : {})
         };
         const { data: insertedLot, error: lotError } = await db.from("omnisight_discovered_lots")
           .upsert(row, { onConflict: "source_id,source_lot_key", ignoreDuplicates: true })
           .select("id");
         if (lotError) throw lotError;
-        if (insertedLot?.length) qStored++; else qDuplicates++;
+        if (insertedLot?.length) qStored++; else {
+          qDuplicates++;
+          const { data: existingLot, error: existingError } = await db.from("omnisight_discovered_lots")
+            .select("id,image_urls,image_usage_status").eq("source_id", source.id).eq("source_lot_key", hash).maybeSingle();
+          if (existingError) throw existingError;
+          if (existingLot) {
+            const refresh: Record<string, unknown> = { last_seen_at: now, updated_at: now };
+            if (foundImages.length) {
+              const prior = Array.isArray(existingLot.image_urls) ? existingLot.image_urls as string[] : [];
+              refresh.image_urls = [...new Set([...prior, ...foundImages])].slice(0, 8);
+              if (!existingLot.image_usage_status || existingLot.image_usage_status === "link_only") refresh.image_usage_status = "link_only";
+            }
+            const { error: refreshError } = await db.from("omnisight_discovered_lots").update(refresh).eq("id", existingLot.id);
+            if (refreshError) throw refreshError;
+          }
+          if (foundImages.length) {
+
+          }
+        }
         if (pageVerified) qEnriched++;
       }
     }
@@ -295,13 +529,45 @@ Deno.serve(async (req: Request) => {
     pageErrors.push(...(s.errors as string[]));
     queryStats.push(s);
   }
-  const { data: publishedCount, error: publishError } = await db.rpc("omnisight_publish_eligible_lots");
-  if (publishError) throw publishError;
+  const workerStats = queryStats[0] || {};
+  const workerFailed = Number(workerStats.pagesFailed || 0) > 0;
+  const retryDelayMinutes = Math.min(30, 2 ** Number(claimedJob.attempts || 1));
+  const jobUpdate = {
+    status: workerFailed ? (Number(claimedJob.attempts || 0) >= 5 ? "paused" : "failed") : "completed",
+    run_after: workerFailed ? new Date(Date.now() + retryDelayMinutes * 60_000).toISOString() : new Date().toISOString(),
+    pages_processed: Number(workerStats.pagesRead || 0),
+    raw_results: Number(workerStats.rawResults || 0),
+    lots_stored: Number(workerStats.stored || 0),
+    duplicates: Number(workerStats.duplicates || 0),
+    skipped: Number(workerStats.skipped || 0),
+    last_error_code: workerFailed ? String((workerStats.errors as string[] || []).join(",").slice(0, 120)) : null,
+    finished_at: new Date().toISOString(),
+    locked_at: null,
+    locked_by: null,
+    heartbeat_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  const { error: jobUpdateError } = await db.from("omnisight_search_jobs").update(jobUpdate).eq("id", claimedJob.id);
+  if (jobUpdateError) throw jobUpdateError;
   return Response.json({
-    ok: true, queriesRun: selected.length, queryStats, pagesPerQuery: MAX_PAGES, maxResultsPerPage: MAX_RESULTS_PER_PAGE, pagesRead, pagesFailed, publishedCount: publishedCount ?? 0,
-    rawResults, stored, duplicates, skipped, pagesEnriched, pageErrors,
-    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: selected.length * MAX_PAGES * MAX_RESULTS_PER_PAGE * 1440,
-    mode: "multi-query discovery; global canonical-URL dedupe; approved-domain page checks with per-host crawl delay; USD value evidence only from checked source pages; publication gated by verified active/upcoming status and documented data/image rights",
-    timestamp: new Date().toISOString()
-  });
+    ok: !workerFailed, worker: workerId, jobId: claimedJob.id,
+    assetClass: claimedJob.asset_class, queryStats,
+    rawResults, stored, duplicates, skipped, pagesRead, pagesFailed, pagesEnriched,
+    pageErrors, timestamp: new Date().toISOString()
+  }); 
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "WORKER_FAILED";
+    const terminal = Number(claimedJob.attempts || 0) >= 5;
+    await db.from("omnisight_search_jobs").update({
+      status: terminal ? "paused" : "failed",
+      run_after: new Date(Date.now() + Math.min(30, 2 ** Number(claimedJob.attempts || 1)) * 60_000).toISOString(),
+      last_error_code: message.slice(0, 120),
+      finished_at: new Date().toISOString(),
+      locked_at: null,
+      locked_by: null,
+      heartbeat_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq("id", claimedJob.id);
+    return Response.json({ ok: false, worker: workerId, jobId: claimedJob.id, error: message.slice(0, 120), retry: !terminal });
+  }
 });

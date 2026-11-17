@@ -44,7 +44,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
     const { data, error } = await supabase
       .from('auctions')
       .select('*')
-      .eq('status', 'live')
+      .in('status', ['live', 'upcoming'])
       .order('created_at', { ascending: false })
     if (error) throw error
 
@@ -63,6 +63,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
       bids: Number(row.bids_count ?? 0),
       verified: false,
       creator: row.creator || '',
+      status: row.status === 'upcoming' ? 'UPCOMING' : row.status === 'live' ? 'LIVE' : 'ENDED',
       currency: 'USD',
       publishedValueUsd: Math.max(Number(row.reserve ?? 0), Number(row.current_bid ?? 0)),
       valueBasis: 'platform_bid',
@@ -78,7 +79,7 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
     Boolean(lot.sourceUrl)
   )
   const eligibleDatabase = databaseLots.filter(lot =>
-    lot.secondsLeft > 0 &&
+    (lot.status === 'UPCOMING' || lot.secondsLeft > 0) &&
     Math.max(lot.currentBid, lot.reserve) >= 500_000
   )
 

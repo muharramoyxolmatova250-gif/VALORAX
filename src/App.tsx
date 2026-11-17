@@ -49,14 +49,36 @@ export default function App() {
   // Eski AUCTION_LOTS demo ma'lumotlari endi ishlatilmaydi.
   const [lots, setLots] = useState<AuctionLot[]>([])
 
-  // Load auction data from API
+  // Keep Live Lots fresh without requiring a manual page reload.
   useEffect(() => {
+    let active = true
+    let loading = false
+
     const loadAuctions = async () => {
-      const auctions = await fetchAllGlobalAuctions()
-      setLots(auctions)
+      if (loading) return
+      loading = true
+      try {
+        const auctions = await fetchAllGlobalAuctions()
+        if (active) setLots(auctions)
+      } finally {
+        loading = false
+      }
     }
 
-    loadAuctions()
+    void loadAuctions()
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadAuctions()
+    }, 30_000)
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') void loadAuctions()
+    }
+    document.addEventListener('visibilitychange', refreshOnFocus)
+
+    return () => {
+      active = false
+      window.clearInterval(refresh)
+      document.removeEventListener('visibilitychange', refreshOnFocus)
+    }
   }, [])
 
   // Bid handler
