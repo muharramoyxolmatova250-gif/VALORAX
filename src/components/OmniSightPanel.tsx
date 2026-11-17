@@ -494,6 +494,58 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
           </button>
         </header>
 
+        {initialLot && (
+          <section className="mb-7 overflow-hidden rounded-2xl border border-[#D4AF37]/25 bg-[#101012] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+            <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="relative min-h-[260px] bg-black">
+                {((initialLot.images?.length ? initialLot.images : [initialLot.image]).filter(Boolean).slice(0, 5)).length > 0 ? (
+                  <div className="grid h-full min-h-[260px] grid-cols-2 gap-1">
+                    {(initialLot.images?.length ? initialLot.images : [initialLot.image]).filter(Boolean).slice(0, 5).map((image, index) => (
+                      <div key={image + index} className={index === 0 ? "row-span-2 overflow-hidden" : "overflow-hidden"}>
+                        <img src={image} alt={initialLot.title + " — image " + (index + 1)} referrerPolicy="no-referrer" className="h-full min-h-[128px] w-full object-cover" onError={event => { event.currentTarget.style.display = 'none' }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex min-h-[260px] items-center justify-center bg-gradient-to-br from-[#211B0B] to-[#080809] text-6xl text-[#D4AF37]/50">◇</div>
+                )}
+                <span className="absolute left-4 top-4 rounded border border-[#D4AF37]/35 bg-black/75 px-3 py-1.5 text-[9px] font-black tracking-[.2em] text-[#D4AF37]">{initialLot.category.toUpperCase()}</span>
+              </div>
+              <div className="flex flex-col justify-between p-5 sm:p-7">
+                <div>
+                  <p className="text-[9px] font-bold tracking-[.28em] text-[#D4AF37]">VALORAX ASSET DOSSIER · LOT {initialLot.lotNumber || initialLot.id}</p>
+                  <h2 className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl">{initialLot.title}</h2>
+                  {initialLot.subtitle && <p className="mt-3 text-sm leading-relaxed text-white/55">{initialLot.subtitle}</p>}
+                  {initialLot.summary && <p className="mt-3 text-xs leading-relaxed text-white/45">{initialLot.summary}</p>}
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">CURRENT BID / VALUE</p>
+                    <p className="mt-1 text-lg font-black text-[#D4AF37]">{initialLot.currentBid > 0 ? (initialLot.currency || 'USD') + ' ' + initialLot.currentBid.toLocaleString() : initialLot.publishedValueUsd ? 'USD ' + initialLot.publishedValueUsd.toLocaleString() : 'NOT DISCLOSED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION STATUS</p>
+                    <p className="mt-1 text-lg font-black text-white">{initialLot.status || 'STATUS UNCONFIRMED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION DATE</p>
+                    <p className="mt-1 text-xs font-bold text-white/80">{initialLot.saleDate || initialLot.auctionStartsAt || 'NOT PROVIDED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION HOUSE / SOURCE</p>
+                    <p className="mt-1 text-xs font-bold text-white/80">{initialLot.source || initialLot.creator || 'SOURCE NOT PROVIDED'}</p>
+                  </div>
+                </div>
+                {initialLot.sourceUrl && <a href={initialLot.sourceUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-[10px] font-bold tracking-widest text-[#D4AF37] hover:underline">OPEN ORIGINAL LOT PAGE ↗</a>}
+              </div>
+            </div>
+            <div className="border-t border-[#D4AF37]/20 bg-[#D4AF37]/[.045] px-5 py-3">
+              <p className="text-[9px] font-black tracking-[.24em] text-[#D4AF37]">INDEPENDENT ASSET EVIDENCE WORKSPACE</p>
+              <p className="mt-1 text-xs text-white/45">Below: OMNISIGHT intelligence findings, GOOD / BAD signals, risks, unknowns and cited evidence for this selected lot.</p>
+            </div>
+          </section>
+        )}
+
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-4 text-sm text-amber-100/80">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div>
