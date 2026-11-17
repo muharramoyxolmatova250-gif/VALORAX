@@ -2,7 +2,15 @@ use_default_settings: true
 
 general:
   debug: false
-  instance_name: "VALORAX OmniSight Search"
+  instance_name: "Valorax OmniSight Search"
+  contact_url: "https://valorax.netlify.app/"
+
+server:
+  # Replaced at runtime by the private Render environment variable SEARXNG_SECRET.
+  secret_key: "ultrasecretkey"
+  limiter: false
+  public_instance: false
+  image_proxy: false
 
 search:
   safe_search: 1
@@ -10,18 +18,12 @@ search:
     - html
     - json
 
-server:
-  # Overridden at runtime by SEARXNG_SECRET.
-  secret_key: "replace-through-SEARXNG_SECRET"
-  # Keep limiter enabled; requires a working Valkey connection.
-  limiter: true
-  public_instance: false
-  image_proxy: false
-
-valkey:
-  # Overridden at runtime by SEARXNG_VALKEY_URL.
-  url: "valkey://localhost:6379/0"
-
 outgoing:
-  request_timeout: 8.0
-  max_request_timeout: 12.0
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+
+engines:
+  - name: ahmia
+    disabled: true
+  - name: torch
+    disabled: true
