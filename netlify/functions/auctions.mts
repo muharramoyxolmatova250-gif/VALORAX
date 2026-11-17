@@ -63,7 +63,7 @@ export default async () => {
         real_estate: 'Real Estate',
         property: 'Real Estate',
         aircraft: 'Aircraft',
-        yacht: 'Aircraft',
+        yacht: 'Luxury',
         collectible: 'Collectibles',
         coin: 'Collectibles',
         historical_artifact: 'Historical',
@@ -129,7 +129,7 @@ export default async () => {
     })
 
     return Response.json(lotsWithAi, {
-      headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' },
+      headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' },
     })
   } catch (error) {
     console.error('VALORAX catalogue request failed:', error)
