@@ -7,27 +7,26 @@ const SEARXNG_BASE_URL = "https://valorax-searxng.onrender.com";
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const PASSES = [
-  ["hypercar", "site:rmsothebys.com OR site:bonhams.com OR site:goodingco.com hypercar auction lot upcoming"],
-  ["classic_car", "classic car auction lot upcoming live estimate"],
-  ["racing_car", "historic racing car auction lot upcoming estimate"],
-  ["watch", "rare luxury watch auction lot upcoming estimate"],
-  ["fine_art", "fine art painting auction lot upcoming estimate"],
-  ["sculpture", "rare sculpture auction lot upcoming estimate"],
-  ["jewellery", "exceptional jewellery gemstone auction lot estimate"],
-  ["coin", "rare coin banknote auction lot estimate"],
-  ["historical_artifact", "historical artifact antiquities auction lot upcoming"],
-  ["collectible", "rare collectible memorabilia auction lot estimate"],
-  ["yacht", "superyacht yacht auction listing asking price"],
-  ["aircraft", "private aircraft helicopter auction listing price"],
-  ["real_estate", "luxury estate trophy real estate auction listing"],
-  ["business", "business equity company stake auction listing"]
+  ["hypercar", 'hypercar "bidding now" OR "upcoming auction" lot estimate $500000'],
+  ["classic_car", 'classic car "open for bidding" OR "upcoming auction" individual lot estimate $500000'],
+  ["racing_car", 'historic racing car "bidding now" OR "upcoming auction" lot estimate $500000'],
+  ["watch", 'rare luxury watch "open for bidding" OR "upcoming auction" lot estimate $500000'],
+  ["fine_art", 'masterpiece painting "bidding now" OR "upcoming auction" individual lot estimate $500000'],
+  ["sculpture", 'important sculpture "open for bidding" OR "upcoming auction" lot estimate $500000'],
+  ["jewellery", 'important diamond jewellery "bidding now" OR "upcoming auction" lot estimate $500000'],
+  ["coin", 'rare coin "open for bidding" OR "upcoming auction" lot estimate $500000'],
+  ["historical_artifact", 'important antiquity "bidding now" OR "upcoming auction" lot estimate $500000'],
+  ["collectible", 'important collectible memorabilia "open for bidding" OR "upcoming auction" lot estimate $500000'],
+  ["yacht", 'superyacht "for sale by auction" "bidding open" asking price'],
+  ["aircraft", 'private jet aircraft "auction" "bidding open" asking price'],
+  ["real_estate", 'trophy estate "property auction" "bidding open" asking price'],
+  ["business", 'company equity "open for bids" OR "auction" current offering valuation']
 ] as const;
 
-const MAX_PAGES = 3;
+const MAX_PAGES = 5;
 const MAX_RESULTS_PER_PAGE = 10;
 const USER_AGENT = "VALORAX-OmniSight/1.1 (+https://valorax.netlify.app)";
 const PRIVATE_HOSTS = new Set(["localhost", "localhost.localdomain", "metadata.google.internal"]);
-const EXCLUDED_SOURCE_HOSTS = new Set(["gsaauctions.gov", "www.gsaauctions.gov"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string"
@@ -80,7 +79,28 @@ function jsonLd(html: string) {
   }
   return found;
 }
-function parsePage(html: string, fallback: string) {
+
+function extractUsdLotValue(html: string): number | null {
+  const text = cleanText(html, 250000);
+  const patterns = [
+    /(?:estimate(?:d)?(?:\s+(?:at|between|from))?|asking\s+price|starting\s+bid|current\s+bid|reserve(?:\s+price)?|valuation|price)\D{0,100}\$\s*([\d,]+(?:\.\d+)?)\s*(million|mn|m|thousand|k)?\b/ig,
+    /(?:estimate(?:d)?(?:\s+(?:at|between|from))?|asking\s+price|starting\s+bid|current\s+bid|reserve(?:\s+price)?|valuation|price)\D{0,100}USD\s*([\d,]+(?:\.\d+)?)\s*(million|mn|m|thousand|k)?\b/ig
+  ];
+  for (const re of patterns) {
+    for (const match of text.matchAll(re)) {
+      const base = Number(match[1].replace(/,/g, ""));
+      const unit = (match[2] || "").toLowerCase();
+      const value = base * (["million", "mn", "m"].includes(unit) ? 1_000_000 : ["thousand", "k"].includes(unit) ? 1_000 : 1);
+      if (Number.isFinite(value) && value >= 500000 && value < 1e12) return value;
+    }
+  }
+  return null;
+}
+function has500kUsdEvidence(text: string) {
+  return extractUsdLotValue(text) !== null;
+}
+
+function parsePage(html: string, fallback: string, pageUrl: URL) {
   const nodes = jsonLd(html);
   const node = nodes.find(n => /Product|Vehicle|IndividualProduct|Event/i.test(String(n["@type"] || ""))) || nodes[0] || {};
   const title = cleanText(meta(html, ["og:title", "twitter:title"]) || node.name || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "") || fallback, 500);
@@ -90,42 +110,93 @@ function parsePage(html: string, fallback: string) {
   const priceRaw = offer.price ?? node.price ?? meta(html, ["product:price:amount"]);
   const price = typeof priceRaw === "number" ? priceRaw : (typeof priceRaw === "string" && /^\d+(\.\d+)?$/.test(priceRaw.replace(/,/g, "")) ? Number(priceRaw.replace(/,/g, "")) : null);
   const currency = cleanText(offer.priceCurrency || meta(html, ["product:price:currency"]), 3).toUpperCase();
+  const visibleUsdValue = extractUsdLotValue(html);
   const availability = cleanText(offer.availability || "", 100);
-  const imageValue = node.image || meta(html, ["og:image", "twitter:image", "twitter:image:src"]);
-  const imageCandidates = (Array.isArray(imageValue) ? imageValue : [imageValue])
-    .flatMap(value => typeof value === "string" ? [value] : value && typeof value === "object" && typeof (value as Record<string, unknown>).url === "string" ? [(value as Record<string, unknown>).url as string] : [])
-    .map(value => { try { const imageUrl = new URL(value, fallback); return imageUrl.protocol === "https:" ? imageUrl.href : null; } catch { return null; } })
-    .filter((value): value is string => Boolean(value))
-    .slice(0, 8);
-  if (imageCandidates.length) result.image_urls = [...new Set(imageCandidates)];
+  const rawImages: string[] = [];
+  const metaImage = meta(html, ["og:image", "og:image:url", "twitter:image", "twitter:image:src"]);
+  if (metaImage) rawImages.push(metaImage);
+  const nodeImage = typeof node.image === "string" ? [node.image] : Array.isArray(node.image) ? node.image.map((v: unknown) => typeof v === "string" ? v : v && typeof v === "object" ? String((v as Record<string, unknown>).url || "") : "") : node.image && typeof node.image === "object" ? [String((node.image as Record<string, unknown>).url || "")] : [];
+  rawImages.push(...nodeImage);
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const a = attrs(m[0]);
+    const candidate = a.src || a["data-src"] || a["data-original"] || (a.srcset ? a.srcset.split(",")[0].trim().split(/\s+/)[0] : "");
+    if (candidate) rawImages.push(candidate);
+  }
+  const imageUrls: string[] = [];
+  for (const raw of rawImages) {
+    try {
+      const candidate = new URL(String(raw || ""), pageUrl);
+      const path = candidate.pathname.toLowerCase();
+      if (candidate.protocol !== "https:" || !candidate.hostname.includes(".") || candidate.username || candidate.password) continue;
+      if (candidate.href === pageUrl.href) continue;
+      if (["logo", "icon", "avatar", "sprite", "placeholder", "tracking"].some(term => path.includes(term))) continue;
+      if (path.endsWith(".svg") || path.endsWith(".gif")) continue;
+      if (!imageUrls.includes(candidate.href)) imageUrls.push(candidate.href);
+    } catch { /* ignore invalid image URL */ }
+    if (imageUrls.length >= 8) break;
+  }
   const result: Record<string, unknown> = {};
   if (title) result.title = title;
+  if (imageUrls.length) result.image_urls = imageUrls;
   if (description) result.short_factual_summary = description;
   if (sku) result.lot_number = sku;
-  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12 && /^[A-Z]{3}$/.test(currency)) {
-    result.currency = currency;
+  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12) {
+    if (/^[A-Z]{3}$/.test(currency)) result.currency = currency;
     if (currency === "USD") {
       result.published_value_usd = price;
-      result.value_basis = "source_page_observed_price";
+      result.value_basis = "asking_price";
     }
   }
-  const startRaw = node.startDate || node.startDateTime || node.auctionStartDate;
-  const endRaw = node.endDate || node.endDateTime || node.auctionEndDate;
-  const start = typeof startRaw === "string" ? new Date(startRaw) : null;
-  const end = typeof endRaw === "string" ? new Date(endRaw) : null;
-  if (start && Number.isFinite(start.getTime())) result.auction_starts_at = start.toISOString();
-  if (end && Number.isFinite(end.getTime())) result.auction_ends_at = end.toISOString();
-  const organizer = (node.organizer && typeof node.organizer === "object" ? node.organizer : {}) as Record<string, unknown>;
-  const seller = (node.seller && typeof node.seller === "object" ? node.seller : {}) as Record<string, unknown>;
-  const auctionHouse = cleanText(organizer.name || seller.name, 200);
-  if (auctionHouse) result.auction_house = auctionHouse;
+  if (visibleUsdValue !== null && (currency === "USD" || /\$/.test(cleanText(html, 250000)))) {
+    result.published_value_usd = visibleUsdValue;
+    result.value_basis = "estimate_or_asking_price";
+  }
   if (/soldout|outofstock/i.test(availability)) result.listing_status = "sold";
-  else if (start && Number.isFinite(start.getTime()) && start.getTime() > Date.now()) result.listing_status = "upcoming";
-  else if (end && Number.isFinite(end.getTime()) && end.getTime() < Date.now()) result.listing_status = "closed";
   else if (/instock|limitedavailability/i.test(availability)) result.listing_status = "active";
-  else if (start && Number.isFinite(start.getTime())) result.listing_status = "active";
   return result;
 }
+
+async function searchLotImages(title: string, lotUrl: URL, expectedHost: string): Promise<string[]> {
+  // Search the open web like a normal visual search: exact artwork/lot title,
+  // not only images hosted on the auction house's own domain.
+  const query = new URL("/search", SEARXNG_BASE_URL);
+  query.searchParams.set("q", '"' + title.slice(0, 140).replace(/["']/g, " ") + '" auction artwork');
+  query.searchParams.set("format", "json");
+  query.searchParams.set("categories", "images");
+  query.searchParams.set("language", "en");
+  query.searchParams.set("safesearch", "1");
+  query.searchParams.set("engines", "yandex,bing");
+  const response = await fetch(query, {
+    headers: { "User-Agent": USER_AGENT, "Accept": "application/json" },
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!response.ok) return [];
+  const payload = await response.json();
+  const images: string[] = [];
+  const normalize = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+  const titleNorm = normalize(title);
+  const titleTokens = titleNorm.split(/\s+/).filter(t => t.length > 2 && !["the","and","with","from","pour","les","des"].includes(t));
+  for (const raw of (Array.isArray(payload.results) ? payload.results : []).slice(0, 30)) {
+    const hit = raw as Record<string, unknown>;
+    const evidence = normalize([hit.title, hit.content, hit.source, hit.url].filter(Boolean).join(" "));
+    const matched = titleTokens.filter(token => evidence.includes(token)).length;
+    // Require a meaningful title match so unrelated auction pictures are not attached.
+    if (!evidence.includes(titleNorm) && matched < Math.max(2, Math.ceil(titleTokens.length * 0.6))) continue;
+    const rawImage = typeof hit.img_src === "string" ? hit.img_src
+      : typeof hit.thumbnail_src === "string" ? hit.thumbnail_src
+      : "";
+    try {
+      const image = new URL(rawImage, lotUrl);
+      if (image.protocol !== "https:" || !image.hostname.includes(".") || image.username || image.password) continue;
+      if (["localhost", "metadata.google.internal"].includes(image.hostname.toLowerCase())) continue;
+      if (/\.(svg|gif)(?:$|\?)/i.test(image.href)) continue;
+      if (!images.includes(image.href)) images.push(image.href);
+    } catch { /* ignore malformed image results */ }
+    if (images.length >= 4) break;
+  }
+  return images;
+}
+
 async function robotsAllows(url: URL) {
   const robotsUrl = new URL("/robots.txt", url.origin);
   const response = await fetch(robotsUrl, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(5000), redirect: "error" });
@@ -148,54 +219,42 @@ async function robotsAllows(url: URL) {
   }
   return !disallows.some(path => url.pathname.startsWith(path));
 }
-async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fallback: string, sourceFetchAt: Map<string, number>) {
+async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fallback: string) {
   if (source.enabled !== true || source.automated_access_allowed !== true || source.access_status !== "approved" || !["permitted", "licensed", "permission_granted"].includes(String(source.terms_status))) {
     return { checked: false, reason: "SOURCE_NOT_APPROVED", patch: {} };
   }
   if (!await robotsAllows(url)) return { checked: false, reason: "ROBOTS_DISALLOW_OR_UNAVAILABLE", patch: {} };
   const delay = Math.max(1000, Number(source.crawl_delay_ms || 1000));
-  const last = sourceFetchAt.get(url.hostname) || 0;
-  if (Date.now() - last < delay) return { checked: false, reason: "SOURCE_CRAWL_DELAY", patch: {} };
-  sourceFetchAt.set(url.hostname, Date.now());
-
-  const response = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml;q=0.9" },
-    signal: AbortSignal.timeout(10000),
-    redirect: "follow"
-  });
+  const last = source.last_checked_at ? new Date(String(source.last_checked_at)).getTime() : 0;
+  if (last && Date.now() - last < delay) return { checked: false, reason: "SOURCE_CRAWL_DELAY", patch: {} };
+  const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml;q=0.9" }, signal: AbortSignal.timeout(10000), redirect: "follow" });
   const finalUrl = new URL(response.url || url.href);
-  if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) {
-    return { checked: false, reason: "LOT_PAGE_FETCH_FAILED", patch: {} };
-  }
-  if (!(response.headers.get("content-type") || "").toLowerCase().includes("text/html")) {
-    return { checked: false, reason: "NOT_HTML", patch: {} };
-  }
+  if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) return { checked: false, reason: "LOT_PAGE_FETCH_FAILED", patch: {} };
+  if (!(response.headers.get("content-type") || "").toLowerCase().includes("text/html")) return { checked: false, reason: "NOT_HTML", patch: {} };
   const reader = response.body?.getReader();
   if (!reader) return { checked: false, reason: "EMPTY_PAGE", patch: {} };
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+  const chunks: Uint8Array[] = []; let total = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > 1_000_000) {
-      await reader.cancel();
-      return { checked: false, reason: "PAGE_TOO_LARGE", patch: {} };
-    }
+    if (total > 1_000_000) { await reader.cancel(); return { checked: false, reason: "PAGE_TOO_LARGE", patch: {} }; }
     chunks.push(value);
   }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
+  const bytes = new Uint8Array(total); let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  const html = new TextDecoder().decode(bytes);
-  const patch = parsePage(html, fallback);
-  if (patch.currency === "USD" && typeof patch.published_value_usd === "number" && patch.published_value_usd >= 500000) {
-    patch.value_basis = "asking_price";
-    patch.value_source_url = url.href;
-    patch.value_checked_at = new Date().toISOString();
+  const patch = parsePage(new TextDecoder().decode(bytes), fallback, finalUrl);
+  const imageRights = String(source.image_rights_status || "unknown");
+  if (Array.isArray(patch.image_urls) && patch.image_urls.length) {
+    patch.image_usage_status = imageRights === "licensed" ? "licensed" : imageRights === "permission_granted" ? "permission_granted" : "restricted";
+    if (["licensed", "permission_granted"].includes(imageRights) && source.image_rights_reference && source.image_rights_reviewed_at) {
+      patch.hero_image_url = patch.image_urls[0];
+      patch.image_rights_reference = source.image_rights_reference;
+    }
   }
   return { checked: Object.keys(patch).length > 0, reason: "PAGE_READ", patch };
 }
+
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return Response.json({ error: "POST_REQUIRED" }, { status: 405 });
@@ -205,19 +264,91 @@ Deno.serve(async (req: Request) => {
   const { data: allowed, error: authError } = await db.rpc("omnisight_authorize_worker", { p_token: token });
   if (authError || allowed !== true) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
+  // Enrich previously discovered lots from currently approved sources so existing rows
+  // are not permanently skipped by the discovery upsert's ignoreDuplicates setting.
+  let imagePagesChecked = 0, imageUrlsFound = 0, imagePagesFailed = 0;
+  const { data: approvedSources, error: approvedSourcesError } = await db.from("omnisight_lot_sources")
+    .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
+    .eq("enabled", true).eq("automated_access_allowed", true).eq("access_status", "approved")
+    .in("terms_status", ["permitted", "licensed", "permission_granted"]);
+  if (approvedSourcesError) throw approvedSourcesError;
+  for (const source of (approvedSources || []).slice(0, 3)) {
+    const { data: pendingImages, error: pendingError } = await db.from("omnisight_discovered_lots")
+      .select("id,canonical_url,title,image_urls,hero_image_url")
+      .eq("source_id", source.id)
+      .order("last_checked_at", { ascending: true, nullsFirst: true }).limit(5);
+    if (pendingError) throw pendingError;
+    for (const lot of (pendingImages || [])) {
+      if (lot.hero_image_url || (Array.isArray(lot.image_urls) && lot.image_urls.length > 0)) continue;
+      try {
+        const pageUrl = safeListingUrl(lot.canonical_url);
+        if (!pageUrl) { imagePagesFailed++; continue; }
+        const checked = await readApprovedLotPage(pageUrl, source as Record<string, unknown>, lot.title || "Auction lot");
+        imagePagesChecked++;
+        const patch = checked.patch || {};
+        let candidateImages = Array.isArray(patch.image_urls) ? [...patch.image_urls] as string[] : [];
+        // Fallback: search indexed images for this exact lot, accepting only image hits
+        // whose source page belongs to the approved auction-house domain.
+        if (candidateImages.length === 0) {
+          try {
+            const imageSearchUrl = new URL("/search", SEARXNG_BASE_URL);
+            imageSearchUrl.searchParams.set("q", '"' + String(lot.title || "").slice(0, 160) + '" site:' + source.domain);
+            imageSearchUrl.searchParams.set("format", "json");
+            imageSearchUrl.searchParams.set("categories", "images");
+            imageSearchUrl.searchParams.set("language", "en");
+            imageSearchUrl.searchParams.set("safesearch", "1");
+            imageSearchUrl.searchParams.set("engines", "yandex,bing");
+            const imageResponse = await fetch(imageSearchUrl, { headers: { "User-Agent": USER_AGENT, "Accept": "application/json" }, signal: AbortSignal.timeout(10000) });
+            if (imageResponse.ok) {
+              const imagePayload = await imageResponse.json();
+              for (const hit of (Array.isArray(imagePayload.results) ? imagePayload.results : []).slice(0, 10)) {
+                const item = hit as Record<string, unknown>;
+                const sourcePage = safeListingUrl(item.url);
+                const imageUrl = safeListingUrl(item.img_src || item.thumbnail_src);
+                if (!sourcePage || !imageUrl || sourcePage.hostname.toLowerCase().replace(/^www\./, "") !== String(source.domain).toLowerCase().replace(/^www\./, "")) continue;
+                if (!candidateImages.includes(imageUrl.href)) candidateImages.push(imageUrl.href);
+                if (candidateImages.length >= 8) break;
+              }
+            }
+          } catch { /* image search is optional; retry on the next scheduled pass */ }
+        }
+        if (candidateImages.length > 0) {
+          const imageRights = String(source.image_rights_status || "unknown");
+          const canDisplay = ["licensed", "permission_granted"].includes(imageRights) && source.image_rights_reference && source.image_rights_reviewed_at;
+          const imageUpdate: Record<string, unknown> = {
+            image_urls: candidateImages,
+            image_usage_status: canDisplay ? imageRights : "restricted",
+            updated_at: new Date().toISOString()
+          };
+          if (canDisplay) {
+            imageUpdate.hero_image_url = candidateImages[0];
+            imageUpdate.image_rights_reference = source.image_rights_reference;
+          }
+          if (patch.hero_image_url && patch.image_rights_reference) {
+            imageUpdate.hero_image_url = patch.hero_image_url;
+            imageUpdate.image_rights_reference = patch.image_rights_reference;
+          }
+          const { error: updateError } = await db.from("omnisight_discovered_lots").update(imageUpdate).eq("id", lot.id);
+          if (updateError) throw updateError;
+          imageUrlsFound++;
+        }
+      } catch { imagePagesFailed++; }
+    }
+  }
   const minute = Math.floor(Date.now() / 60000);
-  const batchSize = 3;
+  const batchSize = PASSES.length;
   const selected = Array.from({length: batchSize}, (_, i) => PASSES[(minute * batchSize + i) % PASSES.length]);
-  let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0;
+  let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0, imageSearches = 0, imageResultsFound = 0;
   const pageErrors: string[] = [];
   const queryStats: Array<Record<string, unknown>> = [];
-  const sourceFetchAt = new Map<string, number>();
+  const rejectionSamples: Array<Record<string, unknown>> = [];
   const runQuery = async ([assetClass, query]: readonly [string, string]) => {
     let qRaw = 0, qPages = 0, qFailed = 0, qStored = 0, qDuplicates = 0, qSkipped = 0, qEnriched = 0;
     const errors: string[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const searchUrl = new URL("/search", SEARXNG_BASE_URL);
-      searchUrl.searchParams.set("q", query);
+      const valueQualifiedQuery = `${query} ("$500,000+" OR "$500k+" OR "500,000 USD" OR "estimate $500,000" OR "over $500,000") ("with photos" OR images OR photographs OR "photo gallery" OR "view images" OR "lot pictures")`;
+      searchUrl.searchParams.set("q", valueQualifiedQuery);
       searchUrl.searchParams.set("format", "json");
       searchUrl.searchParams.set("language", "en");
       searchUrl.searchParams.set("safesearch", "1");
@@ -244,11 +375,10 @@ Deno.serve(async (req: Request) => {
         const url = safeListingUrl((hit as Record<string, unknown>)?.url);
         const title = cleanText((hit as Record<string, unknown>)?.title, 500);
         if (!url || !title) { qSkipped++; continue; }
-        const host = url.hostname.toLowerCase().replace(/^www\\./, "");
-        if (EXCLUDED_SOURCE_HOSTS.has(host) || host.endsWith(".gsaauctions.gov")) { qSkipped++; continue; }
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
         const hash = await sha256(url.href);
         let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
-          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,last_policy_reviewed_at")
+          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
           .eq("domain", host).maybeSingle();
         if (sourceReadError) throw sourceReadError;
         if (!source) {
@@ -265,67 +395,97 @@ Deno.serve(async (req: Request) => {
         }
         const summary = cleanText((hit as Record<string, unknown>)?.content, 1200);
         const searchText = (title + " " + summary + " " + url.href).toLowerCase();
-        const lotSignals = ["auction", "lot", "bidding", "bid", "estimate", "hammer price", "sale results", "upcoming sale", "consignment", "catalogue", "catalog"].some(term => searchText.includes(term))
-          || ["/lot/", "/lots/", "/auction/", "/auctions/"].some(part => url.pathname.toLowerCase().includes(part));
-        if (!lotSignals) { qSkipped++; continue; }
+        const path = url.pathname.toLowerCase();
+        // Auction houses use different canonical lot URL patterns. Sotheby's uses
+        // /en/buy/auction/{year}/{sale-slug}/{lot-slug}, not /lot(s)/.
+        const sothebysLotPath = host === "sothebys.com" && /\/en\/buy\/auction\/\d{4}\/[^/]+\/[^/]+\/?$/.test(path);
+        const detailPath = sothebysLotPath || path.includes("/lots/") || path.includes("/lot/")
+          || /\/auctions?\/[^/]+\/lots?\/[^/]+/.test(path);
+        const numberedCatalogTitle = sothebysLotPath && /^\s*\d{1,5}[.]\s+/.test(title);
+        const explicitLotRecordPath = /\/(?:lots?|lot-details?|lotdetail|items?|objects?|artworks?|catalogue|catalog|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path)
+          || sothebysLotPath;
+        const pathParts = path.split("/").filter(Boolean);
+        const excludedPath = /\/(?:search|results|category|categories|departments?|collections?|artists?|auction-calendar|calendar|about|contact|news|blog|events?|buy|sell|login|register|account|help|terms|privacy|tag|tags|page|pages)(?:\/|$)/i.test(path);
+        // Only accept a real lot-detail URL, not an arbitrary product/article page.
+        const strictLotPath = sothebysLotPath
+          || /\/(?:lots?|lot-details?|lotdetail|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path);
+        const titleHasLotIdentity = numberedCatalogTitle
+          || /\b(lot\s*(?:no\.?|number|#)?\s*[:#-]?\s*[a-z0-9-]+|catalogue number|item number)\b/i.test(title)
+          || /\b(lot\s+(?:no\.?|number|#)?|lot\s*#)\b/i.test(title);
+        const hasAuctionEvidence = /\b(auction|bidding|bid|estimate|hammer price|auction house|auctioneer)\b/i.test(title + " " + summary);
+        const closedEvidence = /\b(sold|realized|realised|past auction|auction results|lot results|ended|closed bidding|archived)\b/i.test(title + " " + summary);
+        const openEvidence = /\b(open for bidding|bidding (?:is )?open|bidding now|bid now|current bid|live bidding|upcoming auction|register to bid|accepting bids|auction starts|auction ends|ends in|closes? (?:today|tomorrow|in))\b/i.test(title + " " + summary);
+        const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
+          || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
+        const plausibleItem = strictLotPath && !excludedPath
+          && title.length >= 12 && hasAuctionEvidence && titleHasLotIdentity && !editorialPage;
+        const highValueEvidence = has500kUsdEvidence(title + " " + summary);
+        // Do not store generic search hits: require a specific lot URL, explicit USD 500k+ evidence,
+        // and positive evidence that bidding is currently open or the sale is upcoming.
+        if (!plausibleItem || closedEvidence || !openEvidence || !highValueEvidence) {
+          qSkipped++;
+          if (rejectionSamples.length < 25) rejectionSamples.push({
+            title, url: url.href, path, plausibleItem, titleHasLotIdentity,
+            hasAuctionEvidence, closedEvidence, editorialPage, highValueEvidence, summary: summary.slice(0, 180)
+          });
+          continue;
+        }
         let pagePatch: Record<string, unknown> = {};
         let pageVerified = false;
         if (source?.enabled === true && source?.automated_access_allowed === true && source?.access_status === "approved" && ["permitted", "licensed", "permission_granted"].includes(String(source?.terms_status))) {
           try {
-            const checked = await readApprovedLotPage(url, source as Record<string, unknown>, title, sourceFetchAt);
+            const checked = await readApprovedLotPage(url, source as Record<string, unknown>, title);
             pagePatch = checked.patch;
             pageVerified = checked.checked;
           } catch { /* retry source verification on later pass */ }
         }
-        const now = new Date().toISOString();
-        const { data: existingByUrl, error: duplicateLookupError } = await db.from("omnisight_discovered_lots")
-          .select("id").eq("canonical_url", url.href).limit(1).maybeSingle();
-        if (duplicateLookupError) throw duplicateLookupError;
-        if (existingByUrl?.id) {
-          const { error: touchError } = await db.from("omnisight_discovered_lots")
-            .update({ last_seen_at: now, updated_at: now }).eq("id", existingByUrl.id);
-          if (touchError) throw touchError;
-          qDuplicates++;
-          continue;
+        let foundImages = Array.isArray(pagePatch.image_urls) ? [...pagePatch.image_urls] as string[] : [];
+        if (foundImages.length === 0 && imageSearches < 20) {
+          imageSearches++;
+          try {
+            foundImages = await searchLotImages(String(pagePatch.title || title), url, host);
+            imageResultsFound += foundImages.length;
+          } catch { /* image search is retried on the next discovery pass */ }
         }
+        const now = new Date().toISOString();
         const row = {
           source_id: source.id, source_lot_key: hash, canonical_url: url.href, title: String(pagePatch.title || title),
-          asset_class: assetClass, listing_status: pagePatch.listing_status || "unknown",
+          asset_class: assetClass, listing_status: pagePatch.listing_status || (openEvidence ? (/upcoming auction|auction starts/i.test(searchText) ? "upcoming" : "active") : "unknown"),
           short_factual_summary: pagePatch.short_factual_summary || summary || null,
           source_title: host, source_record_hash: hash,
           verification_status: pageVerified ? "source_checked" : "candidate",
           data_use_status: "review_required", first_seen_at: now, last_seen_at: now,
-          image_urls: [], hero_image_url: null, image_usage_status: "link_only",
-          ...pagePatch
+          image_urls: foundImages, hero_image_url: pagePatch.hero_image_url || null,
+          image_usage_status: pagePatch.image_usage_status || (foundImages.length ? "link_only" : "link_only"),
+          ...pagePatch,
+          image_urls: foundImages,
+          image_usage_status: pagePatch.image_usage_status || "link_only",
+          ...(pagePatch.published_value_usd ? { value_source_url: url.href, value_checked_at: now } : {})
         };
         const { data: insertedLot, error: lotError } = await db.from("omnisight_discovered_lots")
           .upsert(row, { onConflict: "source_id,source_lot_key", ignoreDuplicates: true })
           .select("id");
         if (lotError) throw lotError;
-        if (insertedLot?.length) qStored++; else qDuplicates++;
-        if (pageVerified) qEnriched++;
-        const verifiedValue = Number(pagePatch.published_value_usd);
-        const verifiedStatus = String(pagePatch.listing_status || "unknown");
-        if (insertedLot?.length && pageVerified && verifiedValue >= 500000 &&
-            pagePatch.currency === "USD" && ["active", "upcoming"].includes(verifiedStatus)) {
-          const rightsBasis = String(source?.rights_basis || "");
-          const publicDomainMetadata = /CC0\s*1\.0|Public Domain Dedication/i.test(rightsBasis);
-          if (publicDomainMetadata && source?.last_policy_reviewed_at) {
-            await db.from("omnisight_discovered_lots").update({
-              data_use_status: "public_domain",
-              rights_reference: rightsBasis.slice(0, 1000),
-              rights_reviewed_at: source.last_policy_reviewed_at,
-              image_usage_status: "link_only",
-              hero_image_url: null
-            }).eq("id", insertedLot[0].id);
+        if (insertedLot?.length) qStored++; else {
+          qDuplicates++;
+          const { data: existingLot, error: existingError } = await db.from("omnisight_discovered_lots")
+            .select("id,image_urls,image_usage_status").eq("source_id", source.id).eq("source_lot_key", hash).maybeSingle();
+          if (existingError) throw existingError;
+          if (existingLot) {
+            const refresh: Record<string, unknown> = { last_seen_at: now, updated_at: now };
+            if (foundImages.length) {
+              const prior = Array.isArray(existingLot.image_urls) ? existingLot.image_urls as string[] : [];
+              refresh.image_urls = [...new Set([...prior, ...foundImages])].slice(0, 8);
+              if (!existingLot.image_usage_status || existingLot.image_usage_status === "link_only") refresh.image_usage_status = "link_only";
+            }
+            const { error: refreshError } = await db.from("omnisight_discovered_lots").update(refresh).eq("id", existingLot.id);
+            if (refreshError) throw refreshError;
           }
-          await db.from("omnisight_lot_ai_reports").upsert({
-            lot_id: insertedLot[0].id,
-            report_version: 1,
-            status: "queued",
-            limitations: ["AI visual and evidence analysis queued; image reuse rights remain separate."]
-          }, { onConflict: "lot_id,report_version", ignoreDuplicates: true });
+          if (foundImages.length) {
+
+          }
         }
+        if (pageVerified) qEnriched++;
       }
     }
     return { assetClass, query, rawResults:qRaw, pagesRead:qPages, pagesFailed:qFailed, stored:qStored, duplicates:qDuplicates, skipped:qSkipped, pagesEnriched:qEnriched, errors };
@@ -343,9 +503,9 @@ Deno.serve(async (req: Request) => {
   if (publishError) throw publishError;
   return Response.json({
     ok: true, queriesRun: selected.length, queryStats, pagesPerQuery: MAX_PAGES, maxResultsPerPage: MAX_RESULTS_PER_PAGE, pagesRead, pagesFailed, publishedCount: publishedCount ?? 0,
-    rawResults, stored, duplicates, skipped, pagesEnriched, pageErrors,
-    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: selected.length * MAX_PAGES * MAX_RESULTS_PER_PAGE * 1440,
-    mode: "multi-query discovery; global canonical-URL dedupe; approved-domain page checks with per-host crawl delay; USD value evidence only from checked source pages; publication gated by verified active/upcoming status and documented data/image rights",
+    rawResults, stored, duplicates, skipped, pagesEnriched, rejectionSamples, imagePagesChecked, imageUrlsFound, imagePagesFailed, imageSearches, imageResultsFound, pageErrors,
+    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: selected.length * MAX_PAGES * MAX_RESULTS_PER_PAGE * 144,
+    mode: "strict discovery: individual auction-lot URL, auction evidence and explicit USD 500,000+ value evidence in the search snippet; approved source-page value extraction required before publication; photo/image terms retained; images hidden unless rights are licensed or permission granted",
     timestamp: new Date().toISOString()
   });
 });
