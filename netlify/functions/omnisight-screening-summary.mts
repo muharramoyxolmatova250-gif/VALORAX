@@ -27,7 +27,7 @@ export default async () => {
   const baseUrl = Netlify.env.get('SUPABASE_URL')
   const serviceKey = Netlify.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!baseUrl || !serviceKey || !serviceKey.startsWith('eyJ')) {
+  if (!baseUrl || !serviceKey) {
     return Response.json(
       { error: 'Server-side screening credentials are not configured.' },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
