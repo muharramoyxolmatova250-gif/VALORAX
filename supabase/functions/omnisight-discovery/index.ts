@@ -470,7 +470,8 @@ Deno.serve(async (req: Request) => {
             pageVerified = checked.checked;
           } catch { /* retry source verification on later pass */ }
         }
-        // Skip image search unless this source has separately cleared image rights.
+        // Discover image candidates independently of publication rights.
+        // Candidates remain restricted until the source's image rights are reviewed.
         let foundImages = Array.isArray(pagePatch.image_urls) ? [...pagePatch.image_urls] as string[] : [];
         const imageRightsCleared = source.enabled === true
           && source.automated_access_allowed === true
@@ -478,7 +479,7 @@ Deno.serve(async (req: Request) => {
           && ["licensed", "permission_granted"].includes(String(source.image_rights_status))
           && Boolean(source.image_rights_reference)
           && Boolean(source.image_rights_reviewed_at);
-        if (foundImages.length === 0 && imageRightsCleared && imageSearches < 5) {
+        if (foundImages.length === 0 && imageSearches < 5) {
           imageSearches++;
           try {
             foundImages = await searchLotImages(String(pagePatch.title || title), url, host);
@@ -496,7 +497,7 @@ Deno.serve(async (req: Request) => {
           ...pagePatch,
           image_urls: foundImages,
           hero_image_url: pagePatch.hero_image_url || null,
-          image_usage_status: pagePatch.image_usage_status || "link_only",
+          image_usage_status: pagePatch.image_usage_status || (foundImages.length ? (imageRightsCleared ? "permission_granted" : "restricted") : "link_only"),
           ...(pagePatch.published_value_usd ? { value_source_url: url.href, value_checked_at: now } : {})
         };
         const { data: insertedLot, error: lotError } = await db.from("omnisight_discovered_lots")
