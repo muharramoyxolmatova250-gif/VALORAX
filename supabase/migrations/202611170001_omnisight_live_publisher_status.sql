@@ -1,3 +1,7 @@
+-- The publisher stores image rights review separately from text/data rights.
+alter table public.omnisight_discovered_lots
+  add column if not exists image_rights_reviewed_at timestamptz;
+
 -- Keep the existing strict eligibility policy, but preserve upcoming/live state
 -- when publishing into the Valorax auctions table.
 create or replace function public.omnisight_publish_eligible_lots()
