@@ -27,6 +27,7 @@ const MAX_PAGES = 3;
 const MAX_RESULTS_PER_PAGE = 10;
 const USER_AGENT = "VALORAX-OmniSight/1.1 (+https://valorax.netlify.app)";
 const PRIVATE_HOSTS = new Set(["localhost", "localhost.localdomain", "metadata.google.internal"]);
+const EXCLUDED_SOURCE_HOSTS = new Set(["gsaauctions.gov", "www.gsaauctions.gov"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string"
@@ -230,6 +231,7 @@ Deno.serve(async (req: Request) => {
         const title = cleanText((hit as Record<string, unknown>)?.title, 500);
         if (!url || !title) { qSkipped++; continue; }
         const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+        if (EXCLUDED_SOURCE_HOSTS.has(host) || host.endsWith(".gsaauctions.gov")) { qSkipped++; continue; }
         const hash = await sha256(url.href);
         let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
           .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,last_policy_reviewed_at")
