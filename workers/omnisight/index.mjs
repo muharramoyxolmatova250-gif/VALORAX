@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { chromium } from 'playwright'
 import { Queue, Worker } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 
@@ -167,21 +168,42 @@ async function robotsAllows(url) {
  robotsCache.set(host,{allowed,at:Date.now()})
  return allowed
 }
+let browserPromise
 async function fetchPageHtml(url) {
- const response=await fetch(url,{headers:{'User-Agent':PAGE_USER_AGENT,Accept:'text/html,application/xhtml+xml;q=0.9'},signal:AbortSignal.timeout(12000),redirect:'follow'})
- if(!response.ok)throw new Error('LOT_PAGE_HTTP_'+response.status)
- const finalUrl=new URL(response.url||url),original=new URL(url)
- if(finalUrl.protocol!=='https:'||finalUrl.hostname.toLowerCase().replace(/^www\./,'')!==original.hostname.toLowerCase().replace(/^www\./,''))throw new Error('LOT_PAGE_REDIRECT_HOST_CHANGED')
- if(!(response.headers.get('content-type')||'').toLowerCase().includes('text/html'))throw new Error('LOT_PAGE_NOT_HTML')
- const length=Number(response.headers.get('content-length')||0)
- if(length>MAX_PAGE_BYTES)throw new Error('LOT_PAGE_TOO_LARGE')
- const reader=response.body?.getReader()
- if(!reader)throw new Error('LOT_PAGE_EMPTY')
- const chunks=[];let total=0
- while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>MAX_PAGE_BYTES){await reader.cancel();throw new Error('LOT_PAGE_TOO_LARGE')}chunks.push(value)}
- const bytes=new Uint8Array(total);let offset=0
- for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
- return new TextDecoder().decode(bytes)
+ const original=new URL(url)
+ if(original.protocol!=='https:')throw new Error('LOT_PAGE_HTTPS_REQUIRED')
+ if(!browserPromise)browserPromise=chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']})
+ const browser=await browserPromise
+ const context=await browser.newContext({userAgent:PAGE_USER_AGENT,viewport:{width:1365,height:900},deviceScaleFactor:1})
+ const page=await context.newPage()
+ try {
+  const response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:20000})
+  if(!response)throw new Error('LOT_PAGE_NO_RESPONSE')
+  if(!response.ok())throw new Error('LOT_PAGE_HTTP_'+response.status())
+  const finalUrl=new URL(page.url())
+  if(finalUrl.protocol!=='https:'||finalUrl.hostname.toLowerCase().replace(/^www\\./,'')!==original.hostname.toLowerCase().replace(/^www\\./,''))throw new Error('LOT_PAGE_REDIRECT_HOST_CHANGED')
+  const contentType=response.headers()['content-type']||''
+  if(!contentType.toLowerCase().includes('text/html'))throw new Error('LOT_PAGE_NOT_HTML')
+  await page.waitForTimeout(1200)
+  await page.evaluate(()=>{for(const img of document.images){if(img.loading==='lazy')img.loading='eager'}})
+  await page.waitForTimeout(500)
+  const html=await page.content()
+  if(Buffer.byteLength(html,'utf8')>MAX_PAGE_BYTES)throw new Error('LOT_PAGE_TOO_LARGE')
+  const imageEvidence=await page.locator('img').evaluateAll(nodes=>nodes.slice(0,40).map(img=>({
+   src:img.currentSrc||img.src||'',
+   alt:img.alt||'',
+   width:img.naturalWidth||img.width||0,
+   height:img.naturalHeight||img.height||0,
+   nearbyText:(img.closest('figure')?.innerText||img.parentElement?.innerText||'').slice(0,400)
+  })).filter(img=>img.src))
+  console.log(JSON.stringify({event:'browser_page_inspected',host:original.hostname,imageElements:imageEvidence.length,imagesWithAlt:imageEvidence.filter(x=>x.alt).length,imagesWithDimensions:imageEvidence.filter(x=>x.width>0&&x.height>0).length}))
+  return html
+ } catch(error) {
+  if(error instanceof Error)throw error
+  throw new Error('BROWSER_INSPECTION_FAILED')
+ } finally {
+  await context.close()
+ }
 }
 async function enrichLotPage(item, source, lotId) {
  if(!source.automated_access_allowed||source.access_status!=='approved'||
