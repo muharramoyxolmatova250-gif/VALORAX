@@ -17,7 +17,7 @@ export default async () => {
     })
     const { data, error } = await db
       .from('omnisight_discovered_lots')
-      .select('id,title,asset_class,make,model,model_year,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status,last_seen_at')
+      .select('id,title,asset_class,make,model,model_year,lot_number,sale_date,location,estimate_low,estimate_high,auction_house,canonical_url,listing_status,published_value_usd,currency,value_basis,auction_starts_at,auction_ends_at,hero_image_url,image_urls,image_usage_status,short_factual_summary,verification_status,last_seen_at')
       .in('listing_status', ['active', 'upcoming'])
       .gte('published_value_usd', MIN_VALUE_USD)
       .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -78,6 +78,15 @@ export default async () => {
         publishedValueUsd: value,
         valueBasis: lot.value_basis || 'published_value',
         summary: lot.short_factual_summary || '',
+        lotNumber: lot.lot_number || '',
+        saleDate: lot.sale_date || '',
+        auctionStartsAt: lot.auction_starts_at || '',
+        auctionEndsAt: lot.auction_ends_at || '',
+        location: lot.location || '',
+        estimateLow: lot.estimate_low === null ? undefined : Number(lot.estimate_low),
+        estimateHigh: lot.estimate_high === null ? undefined : Number(lot.estimate_high),
+        images: image ? [image, ...allowedImages.filter((url: string) => url !== image)] : allowedImages,
+        imageRightsStatus: lot.image_usage_status || 'unknown',
       }]
     })
 
