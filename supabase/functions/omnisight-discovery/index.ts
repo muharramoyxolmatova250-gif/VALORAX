@@ -293,7 +293,7 @@ Deno.serve(async (req: Request) => {
         if (insertedLot?.length && pageVerified && verifiedValue >= 500000 &&
             pagePatch.currency === "USD" && ["active", "upcoming"].includes(verifiedStatus)) {
           const rightsBasis = String(source?.rights_basis || "");
-          const publicDomainMetadata = /CC0\\s*1\\.0|Public Domain Dedication/i.test(rightsBasis);
+          const publicDomainMetadata = /CC0\s*1\.0|Public Domain Dedication/i.test(rightsBasis);
           if (publicDomainMetadata && source?.last_policy_reviewed_at) {
             await db.from("omnisight_discovered_lots").update({
               data_use_status: "public_domain",
