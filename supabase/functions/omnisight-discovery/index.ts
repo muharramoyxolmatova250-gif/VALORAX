@@ -404,24 +404,6 @@ Deno.serve(async (req: Request) => {
         const title = cleanText((hit as Record<string, unknown>)?.title, 500);
         if (!url || !title) { qSkipped++; continue; }
         const host = url.hostname.toLowerCase().replace(/^www\./, "");
-        const hash = await sha256(url.href);
-        let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
-          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
-          .eq("domain", host).maybeSingle();
-        if (sourceReadError) throw sourceReadError;
-        if (!source) {
-          const inserted = await db.from("omnisight_lot_sources").insert({
-            domain: host, display_name: host, source_type: "other", access_method: "manual_import",
-            access_status: "pending_review", terms_status: "unknown", automated_access_allowed: false,
-            enabled: false, crawl_delay_ms: 5000, max_requests_per_hour: 1
-          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").single();
-          if (inserted.error) {
-            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").eq("domain", host).maybeSingle();
-            if (retry.error || !retry.data) throw inserted.error;
-            source = retry.data;
-          } else source = inserted.data;
-        }
-        if (!source) { qSkipped++; continue; }
         const summary = cleanText((hit as Record<string, unknown>)?.content, 1200);
         const searchText = (title + " " + summary + " " + url.href).toLowerCase();
         const path = url.pathname.toLowerCase();
@@ -461,6 +443,24 @@ Deno.serve(async (req: Request) => {
           });
           continue;
         }
+        const hash = await sha256(url.href);
+        let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
+          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
+          .eq("domain", host).maybeSingle();
+        if (sourceReadError) throw sourceReadError;
+        if (!source) {
+          const inserted = await db.from("omnisight_lot_sources").insert({
+            domain: host, display_name: host, source_type: "other", access_method: "manual_import",
+            access_status: "pending_review", terms_status: "unknown", automated_access_allowed: false,
+            enabled: false, crawl_delay_ms: 5000, max_requests_per_hour: 1
+          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").single();
+          if (inserted.error) {
+            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").eq("domain", host).maybeSingle();
+            if (retry.error || !retry.data) throw inserted.error;
+            source = retry.data;
+          } else source = inserted.data;
+        }
+        if (!source) { qSkipped++; continue; }
         let pagePatch: Record<string, unknown> = {};
         let pageVerified = false;
         if (source?.enabled === true && source?.automated_access_allowed === true && source?.access_status === "approved" && ["permitted", "licensed", "permission_granted"].includes(String(source?.terms_status))) {
