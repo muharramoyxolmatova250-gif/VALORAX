@@ -24,6 +24,12 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check OmniSight Edge Function
+        run: deno check supabase/functions/omnisight-discovery/index.ts
       - name: Test OMNISIGHT evidence guard
         run: npm run test:omnisight
       - name: Type-check OMNISIGHT frontend
