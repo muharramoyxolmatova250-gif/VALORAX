@@ -6,7 +6,6 @@ general:
   contact_url: "https://valorax.netlify.app/"
 
 server:
-  # Replaced at runtime by the private Render environment variable SEARXNG_SECRET.
   secret_key: "ultrasecretkey"
   limiter: false
   public_instance: false
@@ -19,11 +18,34 @@ search:
     - json
 
 outgoing:
-  request_timeout: 10.0
-  max_request_timeout: 15.0
+  request_timeout: 12.0
+  max_request_timeout: 18.0
+  pool_connections: 20
+  pool_maxsize: 20
 
 engines:
-  - name: ahmia
+  # Providers returning CAPTCHA / rate-limit errors are paused rather than
+  # repeatedly hammered. They can be re-enabled after a clean health test.
+  - name: google
     disabled: true
-  - name: torch
+  - name: google cse
     disabled: true
+  - name: brave
+    disabled: true
+  - name: duckduckgo
+    disabled: true
+  - name: qwant
+    disabled: true
+  # Keep independent engines available for the next health checks.
+  - name: bing
+    disabled: false
+    timeout: 12.0
+  - name: startpage
+    disabled: false
+    timeout: 12.0
+  - name: mojeek
+    disabled: false
+    timeout: 12.0
+  - name: yahoo
+    disabled: false
+    timeout: 12.0
