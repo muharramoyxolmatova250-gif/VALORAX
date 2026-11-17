@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from '../lib/supabase'
@@ -207,6 +207,7 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
+  const autoAnalysisKeyRef = useRef('')
   const [reportLoading, setReportLoading] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authEmail, setAuthEmail] = useState('')
@@ -275,28 +276,47 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
     setAnalysisResult(null)
     setAnalysisError('')
     setReportLoading(true)
-    fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      cache: 'no-store',
-    })
-      .then(async response => {
-        const payload = await response.json()
-        if (response.status === 404) return null
-        if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not load saved report.')
-        return payload as AnalysisResponse
-      })
-      .then(result => {
-        if (active && result) setAnalysisResult(result)
-      })
-      .catch(caught => {
-        if (active) setAnalysisError(caught instanceof Error ? caught.message : 'Could not load saved report.')
-      })
-      .finally(() => {
-        if (active) setReportLoading(false)
-      })
+    const restoreOrRun = async () => {
+      try {
+        const savedResponse = await fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: 'no-store',
+        })
+        if (savedResponse.ok) {
+          const saved = await savedResponse.json() as AnalysisResponse
+          if (active) setAnalysisResult(saved)
+          return
+        }
+        if (savedResponse.status !== 404) {
+          const payload = await savedResponse.json().catch(() => ({}))
+          throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not load saved report.')
+        }
+
+        const assetRecords = records.filter(record => record.assetName === selectedAssetName).slice(0, 12)
+        if (!assetRecords.length || autoAnalysisKeyRef.current === selectedAssetName) return
+        autoAnalysisKeyRef.current = selectedAssetName
+        if (active) setAnalysisLoading(true)
+        const analysisResponse = await fetch('/api/omnisight/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ assetName: selectedAssetName, records: assetRecords }),
+        })
+        const payload = await analysisResponse.json()
+        if (!analysisResponse.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Automatic analysis failed.')
+        if (active) setAnalysisResult(payload as AnalysisResponse)
+      } catch (caught) {
+        if (active) setAnalysisError(caught instanceof Error ? caught.message : 'Could not load or run the report.')
+      } finally {
+        if (active) {
+          setReportLoading(false)
+          setAnalysisLoading(false)
+        }
+      }
+    }
+    void restoreOrRun()
     return () => { active = false }
-  }, [open, session?.access_token, selectedAssetName])
+  }, [open, session?.access_token, selectedAssetName, records])
 
   const runAnalysis = async () => {
     setAnalysisError('')
