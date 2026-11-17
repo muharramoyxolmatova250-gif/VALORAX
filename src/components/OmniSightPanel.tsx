@@ -5,6 +5,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase'
 import { Activity, AlertTriangle, ArrowUpRight, Database, Plus, ShieldCheck, X } from 'lucide-react'
 import { auditEvidence, isHttpUrl, type EvidenceRecord, type EvidenceStatus } from '../omnisight/evidence'
 import type { AuctionLot } from '../types'
+import PremiumScreening from './PremiumScreening'
 import { ADVANCED_ANALYSIS_FUNCTIONS, INTELLIGENCE_MODULES, type IntelligenceFinding } from '../omnisight/intelligence'
 
 const STORAGE_KEY = 'valorax.omnisight.evidence.v1'
