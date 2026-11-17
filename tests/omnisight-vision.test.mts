@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOmniSightVisionContent } from '../netlify/functions/lib/omnisight-vision.mjs'
+import { buildOmniSightVisionContent } from '../netlify/functions/lib/omnisight-vision.mts'
 
 test('includes prompt and only unique HTTPS images', () => {
   const parts = buildOmniSightVisionContent('inspect lot', [
