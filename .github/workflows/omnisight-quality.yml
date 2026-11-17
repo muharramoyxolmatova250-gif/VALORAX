@@ -29,7 +29,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check OmniSight Edge Function
-        run: deno check supabase/functions/omnisight-discovery/index.ts
+        run: deno check --node-modules-dir=auto supabase/functions/omnisight-discovery/index.ts
       - name: Test OMNISIGHT evidence guard
         run: npm run test:omnisight
       - name: Type-check OMNISIGHT frontend
