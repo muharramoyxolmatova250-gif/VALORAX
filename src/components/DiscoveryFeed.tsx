@@ -13,6 +13,8 @@ type Discovery = {
   data_use_status: string
   first_seen_at: string
   last_seen_at: string
+  image_urls?: string[] | null
+  image_usage_status?: string | null
 }
 
 const label = (value: string) => value.replaceAll('_', ' ').toUpperCase()
@@ -74,6 +76,18 @@ export default function DiscoveryFeed() {
                 <span className="rounded border border-[#D4AF37]/20 bg-[#D4AF37]/[.05] px-2 py-1 text-[8px] font-bold tracking-widest text-[#D4AF37]">{label(item.asset_class)}</span>
                 <span className="inline-flex items-center gap-1 text-[8px] font-bold tracking-widest text-amber-300/80"><ShieldAlert size={10}/> REVIEW REQUIRED</span>
               </div>
+              {item.image_usage_status && ['licensed', 'permission_granted'].includes(item.image_usage_status) && item.image_urls?.[0] && (
+                <div className="mb-3 overflow-hidden rounded-md border border-white/10 bg-black/30">
+                  <img
+                    src={item.image_urls[0]}
+                    alt={item.title}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="h-44 w-full object-cover"
+                    onError={event => { event.currentTarget.style.display = 'none' }}
+                  />
+                </div>
+              )}
               <h3 className="line-clamp-2 text-sm font-bold leading-5 text-white">{item.title}</h3>
               <p className="mt-2 text-[10px] text-white/35">{item.source_title || new URL(item.canonical_url).hostname} · {new Date(item.last_seen_at).toLocaleString()}</p>
               {item.short_factual_summary && <p className="mt-3 line-clamp-3 text-xs leading-5 text-white/55">{item.short_factual_summary}</p>}
