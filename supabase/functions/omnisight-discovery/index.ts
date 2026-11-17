@@ -102,19 +102,18 @@ function has500kUsdEvidence(text: string) {
 
 function classifyLotAssetClass(title: string, summary: string, fallback: string) {
   const text = (title + " " + summary).toLowerCase();
-  if (/\\b(patek philippe|rolex|wristwatch|watch|timepiece|nautilus)\\b/.test(text)) return "watch";
-  if (/\\b(coin|sovereign|numismatic|guinea|doubloon)\\b/.test(text)) return "coin";
-  if (/\\b(yacht|superyacht|motor yacht)\\b/.test(text)) return "yacht";
-  if (/\\b(private jet|aircraft|helicopter|cessna|gulfstream|falcon 7x)\\b/.test(text)) return "aircraft";
-  if (/\\b(diamond|jewellery|jewelry|necklace|bracelet|gemstone)\\b/.test(text)) return "jewellery";
-  if (/\\b(sculpture|bronze statue|marble statue)\\b/.test(text)) return "sculpture";
-  if (/\\b(painting|lithograph|oil on canvas|watercolour|watercolor|etching)\\b/.test(text)) return "fine_art";
-  if (/\\b(ferrari|mclaren|bugatti|pagani|koenigsegg|porsche 911 gt|lamborghini)\\b/.test(text)) return "hypercar";
-  if (/\\b(racing car|formula 1|le mans|race car)\\b/.test(text)) return "racing_car";
-  if (/\\b(bentley|morgan|jaguar|aston martin|classic car|rolls-royce|mercedes-benz)\\b/.test(text)) return "classic_car";
+  if (/\b(patek philippe|rolex|wristwatch|watch|timepiece|nautilus)\b/.test(text)) return "watch";
+  if (/\b(coin|sovereign|numismatic|guinea|doubloon)\b/.test(text)) return "coin";
+  if (/\b(yacht|superyacht|motor yacht)\b/.test(text)) return "yacht";
+  if (/\b(private jet|aircraft|helicopter|cessna|gulfstream|falcon 7x)\b/.test(text)) return "aircraft";
+  if (/\b(diamond|jewellery|jewelry|necklace|bracelet|gemstone)\b/.test(text)) return "jewellery";
+  if (/\b(sculpture|bronze statue|marble statue)\b/.test(text)) return "sculpture";
+  if (/\b(painting|lithograph|oil on canvas|watercolour|watercolor|etching)\b/.test(text)) return "fine_art";
+  if (/\b(ferrari|mclaren|bugatti|pagani|koenigsegg|porsche 911 gt|lamborghini)\b/.test(text)) return "hypercar";
+  if (/\b(racing car|formula 1|le mans|race car)\b/.test(text)) return "racing_car";
+  if (/\b(bentley|morgan|jaguar|aston martin|classic car|rolls-royce|mercedes-benz)\b/.test(text)) return "classic_car";
   return fallback;
 }
-
 function parsePage(html: string, fallback: string, pageUrl: URL) {
   const nodes = jsonLd(html);
   const node = nodes.find(n => /Product|Vehicle|IndividualProduct|Event/i.test(String(n["@type"] || ""))) || nodes[0] || {};
@@ -431,7 +430,7 @@ Deno.serve(async (req: Request) => {
         const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
           || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
         const genericLotTitle = /^(view auction lots?|auction lots?|lots?|catalogue|catalog|results|online auction|browse lots?)$/i.test(title.trim());
-        const categoryLandingPath = host === "hibid.com" && /^\\/lots\\/\\d+\\/[^/]+(?:\\/[^/]+)*\\/?$/i.test(path);
+        const categoryLandingPath = host === "hibid.com" && /^\/lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
         const plausibleItem = strictLotPath && !excludedPath && !categoryLandingPath
           && title.length >= 12 && !genericLotTitle && !editorialPage;
         const highValueEvidence = has500kUsdEvidence(title + " " + summary);
