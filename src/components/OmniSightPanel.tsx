@@ -842,7 +842,7 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
           )}
         </section>
 
-        <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
+        <PremiumScreening />\n\n        <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold tracking-widest text-white">LIVE SOURCE FEED</h2>
