@@ -25,10 +25,12 @@ Before enabling a provider, confirm that its plan and contract cover the intende
 
 ## Current implementation boundary
 
-- Existing discovery worker is a single Old Cars Data live-feed adapter, one page (up to 100 items) per scheduled hourly run.
-- Existing public catalogue endpoint reads at most 100 recent rights-cleared active lots.
-- External lots open in a compact OMNISIGHT detail modal with source facts, report state and an explicit button to the original auction page.
-- The multi-provider connector fleet, 100k/day throughput, production image rights approvals, load testing and live provider ingestion are not yet implemented or verified.
+- OmniSight now has a durable category-search queue backed by `omnisight_search_jobs`, atomic `SKIP LOCKED` claims, bounded retries and six concurrent Edge Function workers.
+- Each queued category job searches up to five SearXNG pages. The first observed 14-category run read 660 search results across 66 pages and stored 21 lot-shaped candidates (one duplicate); these were candidates only, not verified or public lots.
+- Candidate records remain `candidate` / `review_required` until an approved source can be checked and rights/value evidence is independently recorded.
+- The separate Old Cars Data live-feed adapter remains a licensed-source connector; it is not the general search worker.
+- The public catalogue endpoint still publishes only records accepted by the database eligibility function.
+- The multi-provider licensed connector fleet, 100k/day measured throughput, production image-rights coverage, load testing and verified live inventory at scale are not yet implemented or demonstrated.
 - Do not enable arbitrary-domain crawling by changing a broad flag. Each source must first pass its own policy and rights review.
 
 ## Release gates
