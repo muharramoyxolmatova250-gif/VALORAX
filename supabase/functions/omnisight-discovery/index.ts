@@ -264,80 +264,77 @@ Deno.serve(async (req: Request) => {
   const { data: allowed, error: authError } = await db.rpc("omnisight_authorize_worker", { p_token: token });
   if (authError || allowed !== true) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
-  // Enrich previously discovered lots from currently approved sources so existing rows
-  // are not permanently skipped by the discovery upsert's ignoreDuplicates setting.
-  let imagePagesChecked = 0, imageUrlsFound = 0, imagePagesFailed = 0;
-  const { data: approvedSources, error: approvedSourcesError } = await db.from("omnisight_lot_sources")
-    .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at")
-    .eq("enabled", true).eq("automated_access_allowed", true).eq("access_status", "approved")
-    .in("terms_status", ["permitted", "licensed", "permission_granted"]);
-  if (approvedSourcesError) throw approvedSourcesError;
-  for (const source of (approvedSources || []).slice(0, 3)) {
-    const { data: pendingImages, error: pendingError } = await db.from("omnisight_discovered_lots")
-      .select("id,canonical_url,title,image_urls,hero_image_url")
-      .eq("source_id", source.id)
-      .order("last_checked_at", { ascending: true, nullsFirst: true }).limit(5);
-    if (pendingError) throw pendingError;
-    for (const lot of (pendingImages || [])) {
-      if (lot.hero_image_url || (Array.isArray(lot.image_urls) && lot.image_urls.length > 0)) continue;
-      try {
-        const pageUrl = safeListingUrl(lot.canonical_url);
-        if (!pageUrl) { imagePagesFailed++; continue; }
-        const checked = await readApprovedLotPage(pageUrl, source as Record<string, unknown>, lot.title || "Auction lot");
-        imagePagesChecked++;
-        const patch = checked.patch || {};
-        let candidateImages = Array.isArray(patch.image_urls) ? [...patch.image_urls] as string[] : [];
-        // Fallback: search indexed images for this exact lot, accepting only image hits
-        // whose source page belongs to the approved auction-house domain.
-        if (candidateImages.length === 0) {
-          try {
-            const imageSearchUrl = new URL("/search", SEARXNG_BASE_URL);
-            imageSearchUrl.searchParams.set("q", '"' + String(lot.title || "").slice(0, 160) + '" site:' + source.domain);
-            imageSearchUrl.searchParams.set("format", "json");
-            imageSearchUrl.searchParams.set("categories", "images");
-            imageSearchUrl.searchParams.set("language", "en");
-            imageSearchUrl.searchParams.set("safesearch", "1");
-            imageSearchUrl.searchParams.set("engines", "yandex,bing");
-            const imageResponse = await fetch(imageSearchUrl, { headers: { "User-Agent": USER_AGENT, "Accept": "application/json" }, signal: AbortSignal.timeout(10000) });
-            if (imageResponse.ok) {
-              const imagePayload = await imageResponse.json();
-              for (const hit of (Array.isArray(imagePayload.results) ? imagePayload.results : []).slice(0, 10)) {
-                const item = hit as Record<string, unknown>;
-                const sourcePage = safeListingUrl(item.url);
-                const imageUrl = safeListingUrl(item.img_src || item.thumbnail_src);
-                if (!sourcePage || !imageUrl || sourcePage.hostname.toLowerCase().replace(/^www\./, "") !== String(source.domain).toLowerCase().replace(/^www\./, "")) continue;
-                if (!candidateImages.includes(imageUrl.href)) candidateImages.push(imageUrl.href);
-                if (candidateImages.length >= 8) break;
-              }
-            }
-          } catch { /* image search is optional; retry on the next scheduled pass */ }
-        }
-        if (candidateImages.length > 0) {
-          const imageRights = String(source.image_rights_status || "unknown");
-          const canDisplay = ["licensed", "permission_granted"].includes(imageRights) && source.image_rights_reference && source.image_rights_reviewed_at;
-          const imageUpdate: Record<string, unknown> = {
-            image_urls: candidateImages,
-            image_usage_status: canDisplay ? imageRights : "restricted",
-            updated_at: new Date().toISOString()
-          };
-          if (canDisplay) {
-            imageUpdate.hero_image_url = candidateImages[0];
-            imageUpdate.image_rights_reference = source.image_rights_reference;
-          }
-          if (patch.hero_image_url && patch.image_rights_reference) {
-            imageUpdate.hero_image_url = patch.hero_image_url;
-            imageUpdate.image_rights_reference = patch.image_rights_reference;
-          }
-          const { error: updateError } = await db.from("omnisight_discovered_lots").update(imageUpdate).eq("id", lot.id);
-          if (updateError) throw updateError;
-          imageUrlsFound++;
-        }
-      } catch { imagePagesFailed++; }
+  const isWorker = body?.mode === "worker";
+  if (!isWorker) {
+    const { data: activeJobs, error: activeError } = await db.from("omnisight_search_jobs")
+      .select("id,status,attempts")
+      .in("status", ["queued", "running", "failed"])
+      .limit(100);
+    if (activeError) throw activeError;
+    const hasWork = (activeJobs || []).some((job: Record<string, unknown>) =>
+      job.status === "queued" || job.status === "running" ||
+      (job.status === "failed" && Number(job.attempts || 0) < 5)
+    );
+    let enqueued = 0;
+    let batchId: string | null = null;
+    if (!hasWork) {
+      batchId = crypto.randomUUID();
+      const { data, error } = await db.rpc("omnisight_enqueue_search_batch", {
+        p_batch_id: batchId,
+        p_jobs: PASSES.map(([asset_class, query]) => ({ asset_class, query }))
+      });
+      if (error) throw error;
+      enqueued = Number(data || 0);
     }
+
+    const workerCount = 6;
+    const endpoint = SUPABASE_URL.replace(/\\/$/, "") + "/functions/v1/omnisight-discovery";
+    const workerRuns = await Promise.allSettled(Array.from({ length: workerCount }, async (_, index) => {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + SERVICE_ROLE,
+          "Content-Type": "application/json",
+          "x-omnisight-cron-secret": token
+        },
+        body: JSON.stringify({ mode: "worker", workerId: "omnisight-" + index + "-" + crypto.randomUUID() }),
+        signal: AbortSignal.timeout(150000)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error("WORKER_HTTP_" + response.status);
+      return payload;
+    }));
+    const workerResults = workerRuns.map((result) => result.status === "fulfilled"
+      ? result.value
+      : { ok: false, error: result.reason instanceof Error ? result.reason.message : "WORKER_FAILED" });
+    const { data: publishedCount, error: publishError } = await db.rpc("omnisight_publish_eligible_lots");
+    if (publishError) throw publishError;
+    const { data: remainingJobs, error: remainingError } = await db.from("omnisight_search_jobs")
+      .select("id,status,attempts")
+      .in("status", ["queued", "running", "failed"])
+      .limit(100);
+    if (remainingError) throw remainingError;
+    const remaining = (remainingJobs || []).filter((job: Record<string, unknown>) =>
+      job.status === "queued" || job.status === "running" ||
+      (job.status === "failed" && Number(job.attempts || 0) < 5)
+    ).length;
+    return Response.json({
+      ok: true, mode: "parallel_search_queue", batchId, enqueued,
+      workersStarted: workerCount,
+      workersSucceeded: workerResults.filter((r: Record<string, unknown>) => r.ok === true).length,
+      workerResults, remainingJobs: remaining, publishedCount: publishedCount ?? 0,
+      timestamp: new Date().toISOString()
+    });
   }
-  const minute = Math.floor(Date.now() / 60000);
-  const batchSize = PASSES.length;
-  const selected = Array.from({length: batchSize}, (_, i) => PASSES[(minute * batchSize + i) % PASSES.length]);
+
+  const workerId = typeof body?.workerId === "string" ? body.workerId.slice(0, 120) : "omnisight-worker";
+  const { data: claimedJobs, error: claimError } = await db.rpc("omnisight_claim_search_job", { p_worker_id: workerId });
+  if (claimError) throw claimError;
+  const claimedJob = Array.isArray(claimedJobs) ? claimedJobs[0] : null;
+  if (!claimedJob) return Response.json({ ok: true, worker: workerId, idle: true });
+
+
+  const selected = [[claimedJob.asset_class, claimedJob.query] as const];
   let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0, imageSearches = 0, imageResultsFound = 0;
   const pageErrors: string[] = [];
   const queryStats: Array<Record<string, unknown>> = [];
@@ -499,12 +496,36 @@ Deno.serve(async (req: Request) => {
     pageErrors.push(...(s.errors as string[]));
     queryStats.push(s);
   }
+  const workerStats = queryStats[0] || {};
+  const workerFailed = Number(workerStats.pagesRead || 0) === 0 && Number(workerStats.pagesFailed || 0) > 0;
+  const jobUpdate = {
+    status: workerFailed ? "failed" : "completed",
+    pages_processed: Number(workerStats.pagesRead || 0),
+    raw_results: Number(workerStats.rawResults || 0),
+    lots_stored: Number(workerStats.stored || 0),
+    duplicates: Number(workerStats.duplicates || 0),
+    skipped: Number(workerStats.skipped || 0),
+    last_error_code: workerFailed ? String((workerStats.errors as string[] || []).join(",").slice(0, 120)) : null,
+    finished_at: new Date().toISOString(),
+    locked_at: null,
+    locked_by: null,
+    heartbeat_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  const { error: jobUpdateError } = await db.from("omnisight_search_jobs").update(jobUpdate).eq("id", claimedJob.id);
+  if (jobUpdateError) throw jobUpdateError;
+  return Response.json({
+    ok: !workerFailed, worker: workerId, jobId: claimedJob.id,
+    assetClass: claimedJob.asset_class, queryStats,
+    rawResults, stored, duplicates, skipped, pagesRead, pagesFailed, pagesEnriched,
+    pageErrors, timestamp: new Date().toISOString()
+  });
   const { data: publishedCount, error: publishError } = await db.rpc("omnisight_publish_eligible_lots");
   if (publishError) throw publishError;
   return Response.json({
     ok: true, queriesRun: selected.length, queryStats, pagesPerQuery: MAX_PAGES, maxResultsPerPage: MAX_RESULTS_PER_PAGE, pagesRead, pagesFailed, publishedCount: publishedCount ?? 0,
     rawResults, stored, duplicates, skipped, pagesEnriched, rejectionSamples, imagePagesChecked, imageUrlsFound, imagePagesFailed, imageSearches, imageResultsFound, pageErrors,
-    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: selected.length * MAX_PAGES * MAX_RESULTS_PER_PAGE * 144,
+    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: 6 * MAX_PAGES * MAX_RESULTS_PER_PAGE * 144,
     mode: "strict discovery: individual auction-lot URL, auction evidence and explicit USD 500,000+ value evidence in the search snippet; approved source-page value extraction required before publication; photo/image terms retained; images hidden unless rights are licensed or permission granted",
     timestamp: new Date().toISOString()
   });
