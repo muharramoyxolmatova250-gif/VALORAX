@@ -28,7 +28,7 @@ jobs:
           case "$SUPABASE_URL" in https://*) ;; *) echo "SUPABASE_URL must use HTTPS"; exit 1;; esac
       - name: Invoke Supabase discovery function
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://rokrbppnohafumsueicg.supabase.co
           OMNISIGHT_CRON_SECRET: ${{ secrets.OMNISIGHT_CRON_SECRET }}
         run: |
           curl --silent --show-error --fail-with-body \
