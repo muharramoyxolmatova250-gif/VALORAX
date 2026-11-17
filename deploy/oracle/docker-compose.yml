@@ -1,0 +1,54 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "384mb", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET}
+      INSTANCE_NAME: VALORAX Search
+    volumes:
+      - searxng_data:/etc/searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  omnisight-worker:
+    build:
+      context: ../../workers/omnisight
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARCH_CONCURRENCY: ${SEARCH_CONCURRENCY:-2}
+      SEARCH_PAGES_PER_QUERY: ${SEARCH_PAGES_PER_QUERY:-2}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      OMNISIGHT_TARGET_DAILY_RAW: ${OMNISIGHT_TARGET_DAILY_RAW:-10000}
+      OMNISIGHT_TARGET_DAILY_CANDIDATES: ${OMNISIGHT_TARGET_DAILY_CANDIDATES:-10000}
+    depends_on:
+      redis:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
+    init: true
+    stop_grace_period: 45s
+
+volumes:
+  redis_data:
+  searxng_data:
