@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from '../lib/supabase'
@@ -155,6 +155,25 @@ type AnalysisResponse = {
   disclaimer: string
 }
 
+type DiscoveredLot = {
+  id: string
+  title: string
+  canonical_url: string
+  source_title: string | null
+  asset_class: string
+  short_factual_summary: string | null
+  listing_status: string
+  verification_status: string
+  data_use_status: string
+  first_seen_at: string
+  last_seen_at: string
+}
+
+function sourceLabel(item: DiscoveredLot) {
+  if (item.source_title) return item.source_title
+  try { return new URL(item.canonical_url).hostname } catch { return 'External source' }
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -188,11 +207,40 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
+  const autoAnalysisKeyRef = useRef('')
   const [reportLoading, setReportLoading] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authEmail, setAuthEmail] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [discoveries, setDiscoveries] = useState<DiscoveredLot[]>([])
+  const [discoveriesLoading, setDiscoveriesLoading] = useState(false)
+  const [discoveriesError, setDiscoveriesError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    setDiscoveriesLoading(true)
+    fetch('/api/discoveries', { cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('Discovery feed is temporarily unavailable.')
+        const payload = await response.json()
+        return Array.isArray(payload) ? payload as DiscoveredLot[] : []
+      })
+      .then(items => {
+        if (active) {
+          setDiscoveries(items)
+          setDiscoveriesError('')
+        }
+      })
+      .catch(error => {
+        if (active) setDiscoveriesError(error instanceof Error ? error.message : 'Could not load discovery leads.')
+      })
+      .finally(() => {
+        if (active) setDiscoveriesLoading(false)
+      })
+    return () => { active = false }
+  }, [open])
 
   useEffect(() => {
     try {
@@ -228,28 +276,47 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
     setAnalysisResult(null)
     setAnalysisError('')
     setReportLoading(true)
-    fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      cache: 'no-store',
-    })
-      .then(async response => {
-        const payload = await response.json()
-        if (response.status === 404) return null
-        if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not load saved report.')
-        return payload as AnalysisResponse
-      })
-      .then(result => {
-        if (active && result) setAnalysisResult(result)
-      })
-      .catch(caught => {
-        if (active) setAnalysisError(caught instanceof Error ? caught.message : 'Could not load saved report.')
-      })
-      .finally(() => {
-        if (active) setReportLoading(false)
-      })
+    const restoreOrRun = async () => {
+      try {
+        const savedResponse = await fetch(`/api/omnisight/analyze?asset=${encodeURIComponent(selectedAssetName)}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: 'no-store',
+        })
+        if (savedResponse.ok) {
+          const saved = await savedResponse.json() as AnalysisResponse
+          if (active) setAnalysisResult(saved)
+          return
+        }
+        if (savedResponse.status !== 404) {
+          const payload = await savedResponse.json().catch(() => ({}))
+          throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not load saved report.')
+        }
+
+        const assetRecords = records.filter(record => record.assetName === selectedAssetName).slice(0, 12)
+        if (!assetRecords.length || autoAnalysisKeyRef.current === selectedAssetName) return
+        autoAnalysisKeyRef.current = selectedAssetName
+        if (active) setAnalysisLoading(true)
+        const analysisResponse = await fetch('/api/omnisight/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ assetName: selectedAssetName, records: assetRecords }),
+        })
+        const payload = await analysisResponse.json()
+        if (!analysisResponse.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Automatic analysis failed.')
+        if (active) setAnalysisResult(payload as AnalysisResponse)
+      } catch (caught) {
+        if (active) setAnalysisError(caught instanceof Error ? caught.message : 'Could not load or run the report.')
+      } finally {
+        if (active) {
+          setReportLoading(false)
+          setAnalysisLoading(false)
+        }
+      }
+    }
+    void restoreOrRun()
     return () => { active = false }
-  }, [open, session?.access_token, selectedAssetName])
+  }, [open, session?.access_token, selectedAssetName, records])
 
   const runAnalysis = async () => {
     setAnalysisError('')
@@ -286,6 +353,35 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
     } finally {
       setAnalysisLoading(false)
     }
+  }
+
+  const importDiscoveredLot = (item: DiscoveredLot) => {
+    const sourceName = sourceLabel(item)
+    const alreadyImported = records.some(record =>
+      record.assetName === item.title && record.sourceUrl === item.canonical_url
+    )
+    if (!alreadyImported) {
+      const record: EvidenceRecord = {
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now()),
+        assetName: item.title,
+        claim: [
+          item.short_factual_summary ? `Source summary: ${item.short_factual_summary}` : '',
+          `Detected asset class: ${item.asset_class}`,
+          `Detected listing status: ${item.listing_status}`,
+          `Current verification status: ${item.verification_status}`,
+          `Data-use status: ${item.data_use_status}`,
+          'Imported from OmniSight global discovery. These are source-reported discovery signals only; listing authenticity, current availability, value and usage rights are not independently verified.',
+        ].filter(Boolean).join(' | '),
+        sourceName,
+        sourceUrl: item.canonical_url,
+        status: 'source_observed',
+        createdAt: new Date().toISOString(),
+      }
+      setRecords(current => [record, ...current])
+    }
+    setAssetName(item.title)
+    setAnalysisResult(null)
+    setAnalysisError('')
   }
 
   const sendMagicLink = async (event: FormEvent<HTMLFormElement>) => {
@@ -398,11 +494,63 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
           </button>
         </header>
 
+        {initialLot && (
+          <section className="mb-7 overflow-hidden rounded-2xl border border-[#D4AF37]/25 bg-[#101012] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+            <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="relative min-h-[260px] bg-black">
+                {((initialLot.images?.length ? initialLot.images : [initialLot.image]).filter(Boolean).slice(0, 5)).length > 0 ? (
+                  <div className="grid h-full min-h-[260px] grid-cols-2 gap-1">
+                    {(initialLot.images?.length ? initialLot.images : [initialLot.image]).filter(Boolean).slice(0, 5).map((image, index) => (
+                      <div key={image + index} className={index === 0 ? "row-span-2 overflow-hidden" : "overflow-hidden"}>
+                        <img src={image} alt={initialLot.title + " — image " + (index + 1)} referrerPolicy="no-referrer" className="h-full min-h-[128px] w-full object-cover" onError={event => { event.currentTarget.style.display = 'none' }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex min-h-[260px] items-center justify-center bg-gradient-to-br from-[#211B0B] to-[#080809] text-6xl text-[#D4AF37]/50">◇</div>
+                )}
+                <span className="absolute left-4 top-4 rounded border border-[#D4AF37]/35 bg-black/75 px-3 py-1.5 text-[9px] font-black tracking-[.2em] text-[#D4AF37]">{initialLot.category.toUpperCase()}</span>
+              </div>
+              <div className="flex flex-col justify-between p-5 sm:p-7">
+                <div>
+                  <p className="text-[9px] font-bold tracking-[.28em] text-[#D4AF37]">VALORAX ASSET DOSSIER · LOT {initialLot.lotNumber || initialLot.id}</p>
+                  <h2 className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl">{initialLot.title}</h2>
+                  {initialLot.subtitle && <p className="mt-3 text-sm leading-relaxed text-white/55">{initialLot.subtitle}</p>}
+                  {initialLot.summary && <p className="mt-3 text-xs leading-relaxed text-white/45">{initialLot.summary}</p>}
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">CURRENT BID / VALUE</p>
+                    <p className="mt-1 text-lg font-black text-[#D4AF37]">{initialLot.currentBid > 0 ? (initialLot.currency || 'USD') + ' ' + initialLot.currentBid.toLocaleString() : initialLot.publishedValueUsd ? 'USD ' + initialLot.publishedValueUsd.toLocaleString() : 'NOT DISCLOSED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION STATUS</p>
+                    <p className="mt-1 text-lg font-black text-white">{initialLot.status || 'STATUS UNCONFIRMED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION DATE</p>
+                    <p className="mt-1 text-xs font-bold text-white/80">{initialLot.saleDate || initialLot.auctionStartsAt || 'NOT PROVIDED'}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                    <p className="text-[8px] font-bold tracking-widest text-white/40">AUCTION HOUSE / SOURCE</p>
+                    <p className="mt-1 text-xs font-bold text-white/80">{initialLot.source || initialLot.creator || 'SOURCE NOT PROVIDED'}</p>
+                  </div>
+                </div>
+                {initialLot.sourceUrl && <a href={initialLot.sourceUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-[10px] font-bold tracking-widest text-[#D4AF37] hover:underline">OPEN ORIGINAL LOT PAGE ↗</a>}
+              </div>
+            </div>
+            <div className="border-t border-[#D4AF37]/20 bg-[#D4AF37]/[.045] px-5 py-3">
+              <p className="text-[9px] font-black tracking-[.24em] text-[#D4AF37]">INDEPENDENT ASSET EVIDENCE WORKSPACE</p>
+              <p className="mt-1 text-xs text-white/45">Below: OMNISIGHT intelligence findings, GOOD / BAD signals, risks, unknowns and cited evidence for this selected lot.</p>
+            </div>
+          </section>
+        )}
+
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-4 text-sm text-amber-100/80">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div>
-            <strong className="block text-amber-200">Evidence workspace — server setup required</strong>
-            Draft evidence records are saved in this browser. Independent server research is currently unavailable until the Netlify server keys and AI model settings are configured. After setup, submitted research is processed server-side and saved to the private VALORAX account. AI findings are research leads, not proof of authenticity, ownership or condition.
+            <strong className="block text-amber-200">Evidence-first review workspace</strong>
+            Discovery results are leads, not verified lots. Imported claims retain their original source link and remain marked as source-observed until independently corroborated. AI findings do not prove authenticity, ownership, condition, value or legal rights.
           </div>
         </div>
 
@@ -440,6 +588,52 @@ export default function OmniSightPanel({ open, onClose, lots, initialLot = null 
           </div>
           {authMessage && <p role="status" className="mt-3 text-xs text-amber-200/80">{authMessage}</p>}
           {!session && <p className="mt-2 text-[10px] leading-relaxed text-white/35">{supabaseConfigured ? 'A one-time sign-in link will be sent by Supabase Auth. Research is unavailable until the link is confirmed.' : 'Supabase URL and anon key must be configured before account sign-in is available.'}</p>}
+        </section>
+
+        <section className="mb-6 rounded-xl border border-[#D4AF37]/25 bg-[#111113] p-5">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-bold tracking-[.24em] text-[#D4AF37]/70">OMNISIGHT · GLOBAL DISCOVERY</p>
+              <h2 className="mt-1 text-sm font-bold tracking-widest text-white">DISCOVERY REVIEW QUEUE</h2>
+              <p className="mt-1 text-xs text-white/40">Import a discovered page into the evidence ledger and begin a source-linked review.</p>
+            </div>
+            <span className="rounded border border-[#D4AF37]/20 px-3 py-2 text-[9px] font-bold tracking-widest text-[#D4AF37]">{discoveries.length} OPEN LEADS</span>
+          </div>
+          {discoveriesLoading ? (
+            <p className="rounded-lg border border-white/10 p-5 text-center text-xs text-white/40">Loading discovery queue…</p>
+          ) : discoveriesError ? (
+            <p role="status" className="rounded-lg border border-amber-400/20 p-4 text-xs text-amber-200/70">{discoveriesError}</p>
+          ) : discoveries.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-white/10 p-5 text-center text-xs text-white/40">No recent discovery leads are available.</p>
+          ) : (
+            <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
+              {discoveries.map(item => {
+                const imported = records.some(record => record.assetName === item.title && record.sourceUrl === item.canonical_url)
+                return (
+                  <article key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="rounded border border-[#D4AF37]/20 px-2 py-1 text-[8px] font-bold tracking-widest text-[#D4AF37]">{item.asset_class.replaceAll('_', ' ').toUpperCase()}</span>
+                          <span className="text-[8px] font-bold tracking-widest text-amber-300/80">REVIEW REQUIRED</span>
+                        </div>
+                        <h3 className="text-xs font-bold leading-5 text-white">{item.title}</h3>
+                        <p className="mt-1 text-[10px] text-white/35">{sourceLabel(item)} · {item.listing_status.replaceAll('_', ' ')}</p>
+                        {item.short_factual_summary && <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-white/50">{item.short_factual_summary}</p>}
+                      </div>
+                      <button type="button" onClick={() => importDiscoveredLot(item)} className="shrink-0 rounded border border-[#D4AF37]/40 px-3 py-2 text-[9px] font-black tracking-widest text-[#D4AF37] transition hover:bg-[#D4AF37] hover:text-black">
+                        {imported ? 'OPEN IN LEDGER' : 'REVIEW IN OMNISIGHT'}
+                      </button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/[.06] pt-2 text-[9px] text-white/30">
+                      <span>{item.verification_status.replaceAll('_', ' ').toUpperCase()} · {item.data_use_status.replaceAll('_', ' ').toUpperCase()}</span>
+                      <a href={item.canonical_url} target="_blank" rel="noreferrer" className="text-[#D4AF37] hover:underline">OPEN ORIGINAL SOURCE ↗</a>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         <section className="mb-6 rounded-xl border border-[#D4AF37]/20 bg-[#111113] p-5">

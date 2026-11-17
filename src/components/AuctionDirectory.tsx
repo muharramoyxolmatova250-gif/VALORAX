@@ -79,7 +79,10 @@ function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot
       whileHover={{ y: -4, boxShadow: '0 18px 50px rgba(212,175,55,0.10)' }}
       className="group cursor-pointer overflow-hidden rounded-xl"
       style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.14)' }}
-      onClick={() => onSelect(lot)}
+      onClick={() => onAnalyze(lot)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onAnalyze(lot) } }}
     >
       <div className="relative h-56 overflow-hidden">
         {lot.image ? (
@@ -161,9 +164,13 @@ function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot
             <Gavel size={11} style={{ color: GOLD_DIM }} />
             <span className="text-[9px] text-white/35">{lot.bids > 0 ? `${lot.bids} bids` : 'Auction data'}</span>
           </div>
-          <motion.span whileHover={{ x: 2 }} className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
-            VIEW LOT <ExternalLink size={9} />
-          </motion.span>
+          <button
+            type="button"
+            onClick={event => { event.stopPropagation(); onAnalyze(lot) }}
+            className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-white/55 transition hover:text-[#D4AF37]"
+          >
+            OPEN LOT DOSSIER <ExternalLink size={9} />
+          </button>
         </div>
 
         <button
