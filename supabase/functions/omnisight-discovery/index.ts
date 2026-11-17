@@ -398,13 +398,14 @@ Deno.serve(async (req: Request) => {
             domain: host, display_name: host, source_type: "other", access_method: "manual_import",
             access_status: "pending_review", terms_status: "unknown", automated_access_allowed: false,
             enabled: false, crawl_delay_ms: 5000, max_requests_per_hour: 1
-          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,crawl_delay_ms,max_requests_per_hour").single();
+          }).select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").single();
           if (inserted.error) {
-            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,crawl_delay_ms,max_requests_per_hour").eq("domain", host).maybeSingle();
+            const retry = await db.from("omnisight_lot_sources").select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,image_rights_status,image_rights_reference,image_rights_reviewed_at").eq("domain", host).maybeSingle();
             if (retry.error || !retry.data) throw inserted.error;
             source = retry.data;
           } else source = inserted.data;
         }
+        if (!source) { qSkipped++; continue; }
         const summary = cleanText((hit as Record<string, unknown>)?.content, 1200);
         const searchText = (title + " " + summary + " " + url.href).toLowerCase();
         const path = url.pathname.toLowerCase();
@@ -469,10 +470,9 @@ Deno.serve(async (req: Request) => {
           source_title: host, source_record_hash: hash,
           verification_status: pageVerified ? "source_checked" : "candidate",
           data_use_status: "review_required", first_seen_at: now, last_seen_at: now,
-          image_urls: foundImages, hero_image_url: pagePatch.hero_image_url || null,
-          image_usage_status: pagePatch.image_usage_status || (foundImages.length ? "link_only" : "link_only"),
           ...pagePatch,
           image_urls: foundImages,
+          hero_image_url: pagePatch.hero_image_url || null,
           image_usage_status: pagePatch.image_usage_status || "link_only",
           ...(pagePatch.published_value_usd ? { value_source_url: url.href, value_checked_at: now } : {})
         };
