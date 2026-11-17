@@ -107,14 +107,30 @@ function classifyLotAssetClass(title: string, summary: string, fallback: string)
   if (/\b(yacht|superyacht|motor yacht)\b/.test(text)) return "yacht";
   if (/\b(private jet|aircraft|helicopter|cessna|gulfstream|falcon 7x)\b/.test(text)) return "aircraft";
   if (/\b(diamond|jewellery|jewelry|necklace|bracelet|gemstone)\b/.test(text)) return "jewellery";
-  if (/\b(sculpture|bronze statue|marble statue)\b/.test(text)) return "sculpture";
-  if (/\b(painting|lithograph|oil on canvas|watercolour|watercolor|etching)\b/.test(text)) return "fine_art";
+  if (/\b(sculpture|bronze statue|marble statue|bust|carved marble)\b/.test(text)) return "sculpture";
+  if (/\b(painting|lithograph|oil on canvas|watercolour|watercolor|etching|canvas)\b/.test(text)) return "fine_art";
+  if (/\b(book|hardcover|paperback|first edition|printed volume)\b/.test(text)) return "collectible";
   if (/\b(ferrari|mclaren|bugatti|pagani|koenigsegg|porsche 911 gt|lamborghini)\b/.test(text)) return "hypercar";
-  if (/\b(racing car|formula 1|le mans|race car)\b/.test(text)) return "racing_car";
-  if (/\b(bentley|morgan|jaguar|aston martin|classic car|rolls-royce|mercedes-benz)\b/.test(text)) return "classic_car";
-  return fallback;
-}
-function parsePage(html: string, fallback: string, pageUrl: URL) {
+  if (/\b(racing car|formula 1|le mans|race car|racing automobile)\b/.test(text)) return "racing_car";
+  if (/\b(bentley|morgan|jaguar|aston martin|classic car|rolls-royce|mercedes-benz|chassis|registration number)\b/.test(text)) return "classic_car";
+  const fallbackEvidence: Record<string, RegExp> = {
+    hypercar: /\b(hypercar|supercar|ferrari|mclaren|bugatti|pagani|koenigsegg|lamborghini)\b/,
+    classic_car: /\b(car|automobile|vehicle|bentley|morgan|jaguar|aston martin|rolls-royce|mercedes)\b/,
+    racing_car: /\b(racing|race car|formula 1|le mans|motorsport)\b/,
+    watch: /\b(watch|wristwatch|timepiece|patek|rolex|omega)\b/,
+    fine_art: /\b(art|painting|artist|canvas|lithograph|etching)\b/,
+    sculpture: /\b(sculpture|statue|bust|marble|bronze)\b/,
+    jewellery: /\b(jewellery|jewelry|diamond|ring|necklace|bracelet|gemstone)\b/,
+    coin: /\b(coin|numismatic|sovereign|guinea|doubloon)\b/,
+    historical_artifact: /\b(antiquit|artifact|artefact|historical|manuscript|relic)\b/,
+    collectible: /\b(collectible|memorabilia|book|poster|signed|memorandum)\b/,
+    yacht: /\b(yacht|vessel|boat|superyacht)\b/,
+    aircraft: /\b(aircraft|plane|jet|helicopter|cessna|gulfstream)\b/,
+    real_estate: /\b(property|estate|land|house|villa|building|real estate)\b/,
+    business: /\b(business|company|equity|shares|enterprise)\b/
+  };
+  return fallbackEvidence[fallback]?.test(text) ? fallback : "unclassified";
+}function parsePage(html: string, fallback: string, pageUrl: URL) {
   const nodes = jsonLd(html);
   const node = nodes.find(n => /Product|Vehicle|IndividualProduct|Event/i.test(String(n["@type"] || ""))) || nodes[0] || {};
   const title = cleanText(meta(html, ["og:title", "twitter:title"]) || node.name || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "") || fallback, 500);
@@ -430,8 +446,8 @@ Deno.serve(async (req: Request) => {
         const openEvidence = /\b(open for bidding|bidding (?:is )?open|bidding now|bid now|current bid|live bidding|upcoming auction|register to bid|accepting bids|auction starts|auction ends|ends in|closes? (?:today|tomorrow|in))\b/i.test(title + " " + summary);
         const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
           || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
-        const genericLotTitle = /^(view auction lots?|auction lots?|lots?|catalogue|catalog|results|online auction|browse lots?)$/i.test(title.trim());
-        const categoryLandingPath = host === "hibid.com" && /^\/lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
+        const genericLotTitle = /^(view auction lots?|auction lots?|lots?|catalogue|catalog|results|online auction|browse lots?|link to .+|click here|view lot)$/i.test(title.trim());
+        const categoryLandingPath = (host === "hibid.com" || host.endsWith(".hibid.com")) && /^\/lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
         const plausibleItem = strictLotPath && !excludedPath && !categoryLandingPath
           && title.length >= 12 && !genericLotTitle && !editorialPage;
         const highValueEvidence = has500kUsdEvidence(title + " " + summary);
