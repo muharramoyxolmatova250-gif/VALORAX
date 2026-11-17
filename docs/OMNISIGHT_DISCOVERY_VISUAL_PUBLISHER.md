@@ -20,7 +20,7 @@ Do not expose the service-role key or OpenAI key in Vite/client variables.
 
 ## Discovery source policy
 
-The source registry is authoritative. A domain must be enabled, approved, and explicitly allowed for automated access. Search results from all other domains remain candidates and are not fetched. The currently approved GSA record documents CC0 1.0 for API listing metadata only; third-party image rights remain separate and are not cleared by this license.
+The source registry is authoritative. A domain must be enabled, approved, and explicitly allowed for automated access. Search results from all other domains remain candidates and are not fetched. GSA Auctions is explicitly excluded from discovery and publication. Every other domain must independently pass the source registry's approval, automated-access and terms checks.
 
 ## Publication gate
 
