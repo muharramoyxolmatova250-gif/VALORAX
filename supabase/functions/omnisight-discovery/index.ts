@@ -345,7 +345,7 @@ Deno.serve(async (req: Request) => {
     const errors: string[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const searchUrl = new URL("/search", SEARXNG_BASE_URL);
-      const valueQualifiedQuery = `${query} ("$500,000+" OR "$500k+" OR "500,000 USD" OR "estimate $500,000" OR "over $500,000") ("with photos" OR images OR photographs OR "photo gallery" OR "view images" OR "lot pictures")`;
+      const valueQualifiedQuery = `${query} "auction lot"`;
       searchUrl.searchParams.set("q", valueQualifiedQuery);
       searchUrl.searchParams.set("format", "json");
       searchUrl.searchParams.set("language", "en");
@@ -403,7 +403,7 @@ Deno.serve(async (req: Request) => {
         const explicitLotRecordPath = /\/(?:lots?|lot-details?|lotdetail|items?|objects?|artworks?|catalogue|catalog|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path)
           || sothebysLotPath;
         const pathParts = path.split("/").filter(Boolean);
-        const excludedPath = /\/(?:search|results|category|categories|departments?|collections?|artists?|auction-calendar|calendar|about|contact|news|blog|events?|buy|sell|login|register|account|help|terms|privacy|tag|tags|page|pages)(?:\/|$)/i.test(path);
+        const excludedPath = !sothebysLotPath && /\/(?:search|results|category|categories|departments?|collections?|artists?|auction-calendar|calendar|about|contact|news|blog|events?|buy|sell|login|register|account|help|terms|privacy|tag|tags|page|pages)(?:\/|$)/i.test(path);
         // Only accept a real lot-detail URL, not an arbitrary product/article page.
         const strictLotPath = sothebysLotPath
           || /\/(?:lots?|lot-details?|lotdetail|auction-lot)\/[^/?#]{2,}(?:\/|$)/i.test(path);
@@ -416,11 +416,11 @@ Deno.serve(async (req: Request) => {
         const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
           || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
         const plausibleItem = strictLotPath && !excludedPath
-          && title.length >= 12 && hasAuctionEvidence && titleHasLotIdentity && !editorialPage;
+          && title.length >= 12 && !editorialPage;
         const highValueEvidence = has500kUsdEvidence(title + " " + summary);
         // Do not store generic search hits: require a specific lot URL, explicit USD 500k+ evidence,
         // and positive evidence that bidding is currently open or the sale is upcoming.
-        if (!plausibleItem || closedEvidence || !openEvidence || !highValueEvidence) {
+        if (!plausibleItem || closedEvidence) {
           qSkipped++;
           if (rejectionSamples.length < 25) rejectionSamples.push({
             title, url: url.href, path, plausibleItem, titleHasLotIdentity,
