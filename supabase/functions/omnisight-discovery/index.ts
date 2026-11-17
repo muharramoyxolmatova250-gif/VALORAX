@@ -148,34 +148,6 @@ async function robotsAllows(url: URL) {
   }
   return !disallows.some(path => url.pathname.startsWith(path));
 }
-async function fetchRenderedHtml(url: URL): Promise<string | null> {
-  const workerUrl = Deno.env.get("OMNISIGHT_BROWSER_WORKER_URL");
-  const token = Deno.env.get("OMNISIGHT_BROWSER_TOKEN");
-  if (!workerUrl || !token) return null;
-  let endpoint: URL;
-  try { endpoint = new URL("/render", workerUrl); } catch { return null; }
-  if (endpoint.protocol !== "https:") return null;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ url: url.href, expectedHost: url.hostname }),
-    signal: AbortSignal.timeout(45000),
-    redirect: "error"
-  });
-  if (!response.ok) throw new Error("BROWSER_WORKER_HTTP_" + response.status);
-  const text = await response.text();
-  if (new TextEncoder().encode(text).byteLength > 1_500_000) throw new Error("BROWSER_WORKER_RESPONSE_TOO_LARGE");
-  const payload = JSON.parse(text) as Record<string, unknown>;
-  if (payload.ok !== true || typeof payload.html !== "string" || typeof payload.finalUrl !== "string") {
-    throw new Error("BROWSER_WORKER_INVALID_RESPONSE");
-  }
-  const finalUrl = new URL(payload.finalUrl);
-  if (finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) {
-    throw new Error("BROWSER_WORKER_FINAL_HOST_MISMATCH");
-  }
-  return payload.html;
-}
-
 async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fallback: string, sourceFetchAt: Map<string, number>) {
   if (source.enabled !== true || source.automated_access_allowed !== true || source.access_status !== "approved" || !["permitted", "licensed", "permission_granted"].includes(String(source.terms_status))) {
     return { checked: false, reason: "SOURCE_NOT_APPROVED", patch: {} };
@@ -185,29 +157,37 @@ async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fa
   const last = sourceFetchAt.get(url.hostname) || 0;
   if (Date.now() - last < delay) return { checked: false, reason: "SOURCE_CRAWL_DELAY", patch: {} };
   sourceFetchAt.set(url.hostname, Date.now());
-  let html: string;
-  const rendered = await fetchRenderedHtml(url);
-  if (rendered !== null) {
-    html = rendered;
-  } else {
-    const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml;q=0.9" }, signal: AbortSignal.timeout(10000), redirect: "follow" });
-    const finalUrl = new URL(response.url || url.href);
-    if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) return { checked: false, reason: "LOT_PAGE_FETCH_FAILED", patch: {} };
-    if (!(response.headers.get("content-type") || "").toLowerCase().includes("text/html")) return { checked: false, reason: "NOT_HTML", patch: {} };
-    const reader = response.body?.getReader();
-    if (!reader) return { checked: false, reason: "EMPTY_PAGE", patch: {} };
-    const chunks: Uint8Array[] = []; let total = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > 1_000_000) { await reader.cancel(); return { checked: false, reason: "PAGE_TOO_LARGE", patch: {} }; }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(total); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    html = new TextDecoder().decode(bytes);
+
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml;q=0.9" },
+    signal: AbortSignal.timeout(10000),
+    redirect: "follow"
+  });
+  const finalUrl = new URL(response.url || url.href);
+  if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== url.hostname.toLowerCase()) {
+    return { checked: false, reason: "LOT_PAGE_FETCH_FAILED", patch: {} };
   }
+  if (!(response.headers.get("content-type") || "").toLowerCase().includes("text/html")) {
+    return { checked: false, reason: "NOT_HTML", patch: {} };
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return { checked: false, reason: "EMPTY_PAGE", patch: {} };
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > 1_000_000) {
+      await reader.cancel();
+      return { checked: false, reason: "PAGE_TOO_LARGE", patch: {} };
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  const html = new TextDecoder().decode(bytes);
   const patch = parsePage(html, fallback);
   if (patch.currency === "USD" && typeof patch.published_value_usd === "number" && patch.published_value_usd >= 500000) {
     patch.value_basis = "asking_price";
@@ -216,7 +196,6 @@ async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fa
   }
   return { checked: Object.keys(patch).length > 0, reason: "PAGE_READ", patch };
 }
-
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return Response.json({ error: "POST_REQUIRED" }, { status: 405 });
