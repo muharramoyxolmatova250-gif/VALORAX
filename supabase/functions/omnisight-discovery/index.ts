@@ -94,9 +94,12 @@ function parsePage(html: string, fallback: string) {
   if (title) result.title = title;
   if (description) result.short_factual_summary = description;
   if (sku) result.lot_number = sku;
-  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12) {
-    result.realised_price = price;
-    if (/^[A-Z]{3}$/.test(currency)) result.currency = currency;
+  if (price !== null && Number.isFinite(price) && price > 0 && price < 1e12 && /^[A-Z]{3}$/.test(currency)) {
+    result.currency = currency;
+    if (currency === "USD") {
+      result.published_value_usd = price;
+      result.value_basis = "source_page_observed_price";
+    }
   }
   const startRaw = node.startDate || node.startDateTime || node.auctionStartDate;
   const endRaw = node.endDate || node.endDateTime || node.auctionEndDate;
