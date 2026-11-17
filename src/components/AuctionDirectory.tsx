@@ -166,10 +166,10 @@ function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot
           </div>
           <button
             type="button"
-            onClick={event => { event.stopPropagation(); onSelect(lot) }}
+            onClick={event => { event.stopPropagation(); onAnalyze(lot) }}
             className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-white/55 transition hover:text-[#D4AF37]"
           >
-            VIEW AUCTION <ExternalLink size={9} />
+            OPEN LOT DOSSIER <ExternalLink size={9} />
           </button>
         </div>
 
