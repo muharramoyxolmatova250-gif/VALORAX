@@ -447,7 +447,7 @@ Deno.serve(async (req: Request) => {
         const editorialPage = /\b(press release|news article|blog post|auction results|sale results|auction calendar|upcoming auctions|past auctions|department|category)\b/i.test(title + " " + summary)
           || /\/(?:news|blog|press|stories|articles|calendar|results|departments|categories)(?:\/|$)/i.test(path);
         const genericLotTitle = /^(view auction lots?|auction lots?|lots?|catalogue|catalog|results|online auction|browse lots?|link to .+|click here|view lot)$/i.test(title.trim());
-        const categoryLandingPath = (host === "hibid.com" || host.endsWith(".hibid.com")) && /^\/lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
+        const categoryLandingPath = (host === "hibid.com" || host.endsWith(".hibid.com")) && /^\/(?:[^/]+\/)?lots\/\d+\/[^/]+(?:\/[^/]+)*\/?$/i.test(path);
         const plausibleItem = strictLotPath && !excludedPath && !categoryLandingPath
           && title.length >= 12 && !genericLotTitle && !editorialPage;
         const highValueEvidence = has500kUsdEvidence(title + " " + summary);
@@ -481,7 +481,7 @@ Deno.serve(async (req: Request) => {
         const now = new Date().toISOString();
         const row = {
           source_id: source.id, source_lot_key: hash, canonical_url: url.href, title: String(pagePatch.title || title),
-          asset_class: classifyLotAssetClass(title, summary, assetClass), listing_status: pagePatch.listing_status || (openEvidence ? (/upcoming auction|auction starts/i.test(searchText) ? "upcoming" : "active") : "unknown"),
+          asset_class: classifyLotAssetClass(title, summary + " " + path, assetClass), listing_status: pagePatch.listing_status || (openEvidence ? (/upcoming auction|auction starts/i.test(searchText) ? "upcoming" : "active") : "unknown"),
           short_factual_summary: pagePatch.short_factual_summary || summary || null,
           source_title: host, source_record_hash: hash,
           verification_status: pageVerified ? "source_checked" : "candidate",
