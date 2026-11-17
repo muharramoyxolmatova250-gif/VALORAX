@@ -500,7 +500,7 @@ Deno.serve(async (req: Request) => {
   const workerStats = queryStats[0] || {};
   const workerFailed = Number(workerStats.pagesRead || 0) === 0 && Number(workerStats.pagesFailed || 0) > 0;
   const jobUpdate = {
-    status: workerFailed ? "failed" : "completed",
+    status: workerFailed ? (Number(claimedJob.attempts || 0) >= 5 ? "paused" : "failed") : "completed",
     pages_processed: Number(workerStats.pagesRead || 0),
     raw_results: Number(workerStats.rawResults || 0),
     lots_stored: Number(workerStats.stored || 0),
