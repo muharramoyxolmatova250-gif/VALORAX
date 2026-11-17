@@ -65,7 +65,7 @@ function listingUrl(record, saleNo) {
       }
     } catch {}
   }
-  return `https://www.gsaauctions.gov/auctions/preview/${encodeURIComponent(String(saleNo))}`;
+  return null;
 }
 
 function assetClass(title) {
@@ -100,6 +100,7 @@ function normalize(record) {
   const highBid = field(record, 'HighBidAmount');
   const reserve = field(record, 'Reserve');
   const sourceUrl = listingUrl(record, saleNo);
+  if (!sourceUrl) return null;
   const lotKey = `${saleNo}:${lotNo || '0'}`;
   const now = new Date().toISOString();
   const imageUrl = field(record, 'ImageURL');
@@ -185,7 +186,7 @@ async function main() {
       'omnisight_discovered_lots?on_conflict=source_id,source_lot_key',
       {
         method: 'POST',
-        headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(batch),
       },
     );
