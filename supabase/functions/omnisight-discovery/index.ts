@@ -288,7 +288,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const workerCount = 6;
-    const endpoint = SUPABASE_URL.replace(/\\/$/, "") + "/functions/v1/omnisight-discovery";
+    const endpoint = (SUPABASE_URL.endsWith("/") ? SUPABASE_URL.slice(0, -1) : SUPABASE_URL) + "/functions/v1/omnisight-discovery";
     const workerRuns = await Promise.allSettled(Array.from({ length: workerCount }, async (_, index) => {
       const response = await fetch(endpoint, {
         method: "POST",
