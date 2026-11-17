@@ -23,7 +23,7 @@ const PASSES = [
   ["business", "business equity auction lot valuation sale"]
 ] as const;
 
-const MAX_PAGES = 5;
+const MAX_PAGES = 8;
 const MAX_RESULTS_PER_PAGE = 10;
 const USER_AGENT = "VALORAX-OmniSight/1.1 (+https://valorax.netlify.app)";
 const PRIVATE_HOSTS = new Set(["localhost", "localhost.localdomain", "metadata.google.internal"]);
@@ -317,7 +317,7 @@ Deno.serve(async (req: Request) => {
       enqueued = Number(data || 0);
     }
 
-    const workerCount = 6;
+    const workerCount = 8;
     const endpoint = (SUPABASE_URL.endsWith("/") ? SUPABASE_URL.slice(0, -1) : SUPABASE_URL) + "/functions/v1/omnisight-discovery";
     const workerRuns = await Promise.allSettled(Array.from({ length: workerCount }, async (_, index) => {
       const response = await fetch(endpoint, {
@@ -470,8 +470,15 @@ Deno.serve(async (req: Request) => {
             pageVerified = checked.checked;
           } catch { /* retry source verification on later pass */ }
         }
+        // Skip image search unless this source has separately cleared image rights.
         let foundImages = Array.isArray(pagePatch.image_urls) ? [...pagePatch.image_urls] as string[] : [];
-        if (foundImages.length === 0 && imageSearches < 20) {
+        const imageRightsCleared = source.enabled === true
+          && source.automated_access_allowed === true
+          && source.access_status === "approved"
+          && ["licensed", "permission_granted"].includes(String(source.image_rights_status))
+          && Boolean(source.image_rights_reference)
+          && Boolean(source.image_rights_reviewed_at);
+        if (foundImages.length === 0 && imageRightsCleared && imageSearches < 5) {
           imageSearches++;
           try {
             foundImages = await searchLotImages(String(pagePatch.title || title), url, host);
