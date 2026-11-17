@@ -195,10 +195,10 @@ async function fetchPageHtml(url) {
    width:img.naturalWidth||img.width||0,
    height:img.naturalHeight||img.height||0,
    nearbyText:(img.closest('figure')?.innerText||img.parentElement?.innerText||'').slice(0,400)
-  })).filter(img=>img.src&&/^https:\\/\\//i.test(img.src)&&img.width>=160&&img.height>=100))
+  })).filter(img=>img.src&&img.src.startsWith('https://')&&img.width>=160&&img.height>=100))
   console.log(JSON.stringify({event:'browser_page_inspected',host:original.hostname,imageElements:imageEvidence.length,imagesWithAlt:imageEvidence.filter(x=>x.alt).length,imagesWithDimensions:imageEvidence.filter(x=>x.width>0&&x.height>0).length}))
   const browserImageNode={ '@type':'Product', image:imageEvidence.map(x=>x.src) }
-  const safeJson=JSON.stringify(browserImageNode).replace(/</g,'\\\\u003c')
+  const safeJson=JSON.stringify(browserImageNode).replace(/</g,'\\u003c')
   return html.replace(/<\\/body>/i,'<script type="application/ld+json">'+safeJson+'</script></body>')
  } catch(error) {
   if(error instanceof Error)throw error
