@@ -6,6 +6,8 @@ general:
   contact_url: "https://valorax.netlify.app/"
 
 server:
+  # Internal discovery service only; external provider throttling is handled by
+  # provider selection and bounded request rates, not by bypassing CAPTCHAs.
   secret_key: "ultrasecretkey"
   limiter: false
   public_instance: false
@@ -24,8 +26,6 @@ outgoing:
   pool_maxsize: 20
 
 engines:
-  # Providers returning CAPTCHA / rate-limit errors are paused rather than
-  # repeatedly hammered. They can be re-enabled after a clean health test.
   - name: google
     disabled: true
   - name: google cse
@@ -36,16 +36,15 @@ engines:
     disabled: true
   - name: qwant
     disabled: true
-  # Keep independent engines available for the next health checks.
+  - name: yahoo
+    disabled: true
+  - name: startpage
+    disabled: true
+  - name: mojeek
+    disabled: true
   - name: bing
     disabled: false
     timeout: 12.0
-  - name: startpage
-    disabled: false
-    timeout: 12.0
-  - name: mojeek
-    disabled: false
-    timeout: 12.0
-  - name: yahoo
+  - name: yandex
     disabled: false
     timeout: 12.0
