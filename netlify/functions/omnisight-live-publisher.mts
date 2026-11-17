@@ -40,9 +40,13 @@ async function publishEligibleLots() {
 export default schedule('*/5 * * * *', async () => {
   if (process.env.OMNISIGHT_PUBLISHER_ENABLED !== 'true') {
     console.log('OMNISIGHT live publisher is disabled')
-    return
+    return { statusCode: 200, body: 'OMNISIGHT publisher disabled' }
   }
-  await publishEligibleLots()
+  const result = await publishEligibleLots()
+  return {
+    statusCode: result.ok ? 200 : 500,
+    body: JSON.stringify(result),
+  }
 })
 
 export const config = { schedule: '*/5 * * * *' }
