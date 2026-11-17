@@ -334,6 +334,7 @@ Deno.serve(async (req: Request) => {
   if (!claimedJob) return Response.json({ ok: true, worker: workerId, idle: true });
 
 
+  try {
   const selected = [[claimedJob.asset_class, claimedJob.query] as const];
   let rawResults = 0, stored = 0, duplicates = 0, skipped = 0, pagesRead = 0, pagesFailed = 0, pagesEnriched = 0, imageSearches = 0, imageResultsFound = 0;
   const pageErrors: string[] = [];
@@ -519,14 +520,20 @@ Deno.serve(async (req: Request) => {
     assetClass: claimedJob.asset_class, queryStats,
     rawResults, stored, duplicates, skipped, pagesRead, pagesFailed, pagesEnriched,
     pageErrors, timestamp: new Date().toISOString()
-  });
-  const { data: publishedCount, error: publishError } = await db.rpc("omnisight_publish_eligible_lots");
-  if (publishError) throw publishError;
-  return Response.json({
-    ok: true, queriesRun: selected.length, queryStats, pagesPerQuery: MAX_PAGES, maxResultsPerPage: MAX_RESULTS_PER_PAGE, pagesRead, pagesFailed, publishedCount: publishedCount ?? 0,
-    rawResults, stored, duplicates, skipped, pagesEnriched, rejectionSamples, imagePagesChecked, imageUrlsFound, imagePagesFailed, imageSearches, imageResultsFound, pageErrors,
-    targetRawPerDay: 100000, theoreticalRawPerDayAtCurrentCadence: 6 * MAX_PAGES * MAX_RESULTS_PER_PAGE * 144,
-    mode: "strict discovery: individual auction-lot URL, auction evidence and explicit USD 500,000+ value evidence in the search snippet; approved source-page value extraction required before publication; photo/image terms retained; images hidden unless rights are licensed or permission granted",
-    timestamp: new Date().toISOString()
-  });
+  }); 
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "WORKER_FAILED";
+    const terminal = Number(claimedJob.attempts || 0) >= 5;
+    await db.from("omnisight_search_jobs").update({
+      status: terminal ? "paused" : "failed",
+      run_after: new Date(Date.now() + Math.min(30, 2 ** Number(claimedJob.attempts || 1)) * 60_000).toISOString(),
+      last_error_code: message.slice(0, 120),
+      finished_at: new Date().toISOString(),
+      locked_at: null,
+      locked_by: null,
+      heartbeat_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq("id", claimedJob.id);
+    return Response.json({ ok: false, worker: workerId, jobId: claimedJob.id, error: message.slice(0, 120), retry: !terminal });
+  }
 });
