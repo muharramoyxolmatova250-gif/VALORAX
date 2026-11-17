@@ -5,7 +5,6 @@ import { useAccount } from 'wagmi'
 import { supabase } from '../lib/supabase'
 import { ModalShell, GoldBtn, SectionLabel, GOLD, GOLD_DIM, GOLD_FAINT } from './ui'
 import type { AuctionLot, BidEntry } from '../types'
-import { GALLERY_IMGS } from '../data'
 
 // ─── Escrow Drawer ────────────────────────────────────────────────────────────
 
@@ -122,7 +121,7 @@ export default function AuctionModal({ lot, open, onClose, onBid }: Props) {
 
   if (!lot) return null
 
-  const imgs = GALLERY_IMGS[lot.id] ?? GALLERY_IMGS.default
+  const imgs = lot.images?.length ? lot.images : []
   const topBid = bidFeed[0]?.amount ?? lot.currentBid
   const minNext = topBid + 50000
 
@@ -220,6 +219,7 @@ export default function AuctionModal({ lot, open, onClose, onBid }: Props) {
 
               {/* Gallery */}
               <div className="overflow-y-auto p-5 space-y-3" style={{ borderRight: `1px solid ${GOLD_FAINT}` }}>
+                {imgs.length > 0 ? <>
                 <div className="relative rounded-lg overflow-hidden bg-[#0F1113]" style={{ aspectRatio: '16/9' }}>
                   <AnimatePresence mode="wait">
                     <motion.img key={galleryIdx} src={imgs[galleryIdx]} alt={lot.title}
@@ -259,6 +259,12 @@ export default function AuctionModal({ lot, open, onClose, onBid }: Props) {
                   ))}
                 </div>
 
+                </> : <div className="rounded-lg bg-[#0F1113] p-8 text-center" style={{ border: `1px solid ${GOLD_FAINT}` }}>
+                  <p className="text-sm font-bold text-white/70">Official photos are not available for display</p>
+                  <p className="mt-2 text-xs text-white/40">VALORAX will show the auction-house photo gallery here when image use is authorized.</p>
+                  {lot.sourceUrl && <a href={lot.sourceUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex text-xs font-bold text-[#D4AF37] underline">OPEN ORIGINAL LOT PAGE</a>}
+                </div>}
+
                 <div className="grid grid-cols-3 gap-2">
                   {[['ESCROW HASH', `0x71...${lot.id.slice(-3).toUpperCase()}`], ['CHAIN', 'ETHEREUM'], ['TOKEN', 'USDT · ERC-20']].map(([k, v]) => (
                     <div key={k} className="p-3 rounded-sm" style={{ background: 'rgba(212,175,55,0.03)', border: `1px solid ${GOLD_FAINT}` }}>
@@ -273,6 +279,16 @@ export default function AuctionModal({ lot, open, onClose, onBid }: Props) {
               <div className="flex flex-col overflow-hidden">
                 {/* Stats */}
                 <div className="p-4 space-y-2 shrink-0" style={{ borderBottom: `1px solid ${GOLD_FAINT}` }}>
+                  <div className="rounded-sm p-3 space-y-1" style={{ background: 'rgba(212,175,55,0.025)', border: `1px solid ${GOLD_FAINT}` }}>
+                    <SectionLabel>OFFICIAL AUCTION DETAILS</SectionLabel>
+                    <p className="text-[10px] text-white/65">{lot.source || 'Auction house not specified'}{lot.lotNumber ? ` · LOT ${lot.lotNumber}` : ''}</p>
+                    {lot.saleDate && <p className="text-[10px] text-white/55">Sale date: {new Date(`${lot.saleDate}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })}</p>}
+                    {lot.auctionStartsAt && <p className="text-[10px] text-white/55">Starts: {new Date(lot.auctionStartsAt).toLocaleString()}</p>}
+                    {lot.auctionEndsAt && <p className="text-[10px] text-white/55">Ends: {new Date(lot.auctionEndsAt).toLocaleString()}</p>}
+                    {lot.location && <p className="text-[10px] text-white/55">Location: {lot.location}</p>}
+                    {(lot.estimateLow != null || lot.estimateHigh != null) && <p className="text-[10px] text-white/55">Estimate: {lot.currency || ''} {lot.estimateLow?.toLocaleString() || '—'} – {lot.estimateHigh?.toLocaleString() || '—'}</p>}
+                    {lot.sourceUrl && <a href={lot.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex pt-1 text-[10px] font-bold text-[#D4AF37] underline">VIEW OFFICIAL SOURCE</a>}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-3 rounded-sm" style={{ background: 'rgba(212,175,55,0.04)', border: `1px solid ${GOLD_FAINT}` }}>
                       <div className="flex items-center gap-1 mb-1"><Clock size={9} style={{ color: GOLD_DIM }} /><SectionLabel>TIME LEFT</SectionLabel></div>
