@@ -171,7 +171,7 @@ type DiscoveredLot = {
 
 function sourceLabel(item: DiscoveredLot) {
   if (item.source_title) return item.source_title
-  try { return new URL(item.canonical_url).hostname.replace(/^www\\./, '') } catch { return 'External source' }
+  try { return new URL(item.canonical_url).hostname } catch { return 'External source' }
 }
 
 interface Props {
