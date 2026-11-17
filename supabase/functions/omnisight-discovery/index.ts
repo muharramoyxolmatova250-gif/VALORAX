@@ -27,6 +27,7 @@ const MAX_PAGES = 3;
 const MAX_RESULTS_PER_PAGE = 10;
 const USER_AGENT = "VALORAX-OmniSight/1.1 (+https://valorax.netlify.app)";
 const PRIVATE_HOSTS = new Set(["localhost", "localhost.localdomain", "metadata.google.internal"]);
+const EXCLUDED_SOURCE_HOSTS = new Set(["gsaauctions.gov", "www.gsaauctions.gov"]);
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string"
@@ -90,6 +91,13 @@ function parsePage(html: string, fallback: string) {
   const price = typeof priceRaw === "number" ? priceRaw : (typeof priceRaw === "string" && /^\d+(\.\d+)?$/.test(priceRaw.replace(/,/g, "")) ? Number(priceRaw.replace(/,/g, "")) : null);
   const currency = cleanText(offer.priceCurrency || meta(html, ["product:price:currency"]), 3).toUpperCase();
   const availability = cleanText(offer.availability || "", 100);
+  const imageValue = node.image || meta(html, ["og:image", "twitter:image", "twitter:image:src"]);
+  const imageCandidates = (Array.isArray(imageValue) ? imageValue : [imageValue])
+    .flatMap(value => typeof value === "string" ? [value] : value && typeof value === "object" && typeof (value as Record<string, unknown>).url === "string" ? [(value as Record<string, unknown>).url as string] : [])
+    .map(value => { try { const imageUrl = new URL(value, fallback); return imageUrl.protocol === "https:" ? imageUrl.href : null; } catch { return null; } })
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 8);
+  if (imageCandidates.length) result.image_urls = [...new Set(imageCandidates)];
   const result: Record<string, unknown> = {};
   if (title) result.title = title;
   if (description) result.short_factual_summary = description;
@@ -111,7 +119,7 @@ function parsePage(html: string, fallback: string) {
   const seller = (node.seller && typeof node.seller === "object" ? node.seller : {}) as Record<string, unknown>;
   const auctionHouse = cleanText(organizer.name || seller.name, 200);
   if (auctionHouse) result.auction_house = auctionHouse;
-  if (/soldout|outofstock/i.test(availability)) result.listing_status = "closed";
+  if (/soldout|outofstock/i.test(availability)) result.listing_status = "sold";
   else if (start && Number.isFinite(start.getTime()) && start.getTime() > Date.now()) result.listing_status = "upcoming";
   else if (end && Number.isFinite(end.getTime()) && end.getTime() < Date.now()) result.listing_status = "closed";
   else if (/instock|limitedavailability/i.test(availability)) result.listing_status = "active";
@@ -166,9 +174,8 @@ async function readApprovedLotPage(url: URL, source: Record<string, unknown>, fa
   const bytes = new Uint8Array(total); let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   const patch = parsePage(new TextDecoder().decode(bytes), fallback);
-  if (patch.currency === "USD" && typeof patch.realised_price === "number" && patch.realised_price >= 500000) {
-    patch.published_value_usd = patch.realised_price;
-    patch.value_basis = "source_page_observed_price";
+  if (patch.currency === "USD" && typeof patch.published_value_usd === "number" && patch.published_value_usd >= 500000) {
+    patch.value_basis = "asking_price";
     patch.value_source_url = url.href;
     patch.value_checked_at = new Date().toISOString();
   }
@@ -224,9 +231,10 @@ Deno.serve(async (req: Request) => {
         const title = cleanText((hit as Record<string, unknown>)?.title, 500);
         if (!url || !title) { qSkipped++; continue; }
         const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+        if (EXCLUDED_SOURCE_HOSTS.has(host) || host.endsWith(".gsaauctions.gov")) { qSkipped++; continue; }
         const hash = await sha256(url.href);
         let { data: source, error: sourceReadError } = await db.from("omnisight_lot_sources")
-          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at")
+          .select("id,domain,enabled,access_status,terms_status,automated_access_allowed,rights_basis,licence_reference,robots_url,crawl_delay_ms,max_requests_per_hour,last_robots_checked_at,last_policy_reviewed_at")
           .eq("domain", host).maybeSingle();
         if (sourceReadError) throw sourceReadError;
         if (!source) {
@@ -282,6 +290,28 @@ Deno.serve(async (req: Request) => {
         if (lotError) throw lotError;
         if (insertedLot?.length) qStored++; else qDuplicates++;
         if (pageVerified) qEnriched++;
+        const verifiedValue = Number(pagePatch.published_value_usd);
+        const verifiedStatus = String(pagePatch.listing_status || "unknown");
+        if (insertedLot?.length && pageVerified && verifiedValue >= 500000 &&
+            pagePatch.currency === "USD" && ["active", "upcoming"].includes(verifiedStatus)) {
+          const rightsBasis = String(source?.rights_basis || "");
+          const publicDomainMetadata = /CC0\s*1\.0|Public Domain Dedication/i.test(rightsBasis);
+          if (publicDomainMetadata && source?.last_policy_reviewed_at) {
+            await db.from("omnisight_discovered_lots").update({
+              data_use_status: "public_domain",
+              rights_reference: rightsBasis.slice(0, 1000),
+              rights_reviewed_at: source.last_policy_reviewed_at,
+              image_usage_status: "link_only",
+              hero_image_url: null
+            }).eq("id", insertedLot[0].id);
+          }
+          await db.from("omnisight_lot_ai_reports").upsert({
+            lot_id: insertedLot[0].id,
+            report_version: 1,
+            status: "queued",
+            limitations: ["AI visual and evidence analysis queued; image reuse rights remain separate."]
+          }, { onConflict: "lot_id,report_version", ignoreDuplicates: true });
+        }
       }
     }
     return { assetClass, query, rawResults:qRaw, pagesRead:qPages, pagesFailed:qFailed, stored:qStored, duplicates:qDuplicates, skipped:qSkipped, pagesEnriched:qEnriched, errors };
