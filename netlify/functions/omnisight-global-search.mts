@@ -25,7 +25,7 @@ const PASSES: SearchPass[] = [
 const MAX_PER_RUN = 25
 const MAX_SNIPPET = 320
 const USER_AGENT = 'VALORAX-OmniSightBot/1.0 (+https://valorax.netlify.app)'
-const BLOCKED_HOSTS = new Set(['google.com', 'bing.com', 'duckduckgo.com', 'searxng.org', 'localhost'])
+const BLOCKED_HOSTS = new Set(['google.com', 'bing.com', 'duckduckgo.com', 'searxng.org', 'localhost', 'gsaauctions.gov'])
 
 function normalizedHost(value: string) {
   return value.toLowerCase().replace(/^www\./, '')
@@ -35,7 +35,7 @@ function safeResult(item: SearchResult, pass: SearchPass) {
   if (typeof item.title !== 'string' || typeof item.url !== 'string') return null
   try {
     const url = new URL(item.url)
-    if (url.protocol !== 'https:' || !url.hostname.includes('.') || BLOCKED_HOSTS.has(normalizedHost(url.hostname))) return null
+    if (url.protocol !== 'https:' || !url.hostname.includes('.') || BLOCKED_HOSTS.has(normalizedHost(url.hostname)) || normalizedHost(url.hostname).endsWith('.gsaauctions.gov')) return null
     if (url.pathname === '/' || url.pathname.length < 2) return null
     const title = item.title.trim().replace(/\s+/g, ' ').slice(0, 500)
     if (!title) return null
