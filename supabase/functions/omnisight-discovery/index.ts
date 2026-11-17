@@ -7,20 +7,20 @@ const SEARXNG_BASE_URL = "https://valorax-searxng.onrender.com";
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const PASSES = [
-  ["hypercar", "hypercar auction lot upcoming bidding estimate"],
-  ["classic_car", "classic car auction lot upcoming sale estimate"],
-  ["racing_car", "historic racing car auction lot upcoming sale estimate"],
-  ["watch", "rare luxury watch auction lot upcoming sale estimate"],
-  ["fine_art", "fine art painting auction lot upcoming sale estimate"],
-  ["sculpture", "important sculpture auction lot upcoming sale estimate"],
-  ["jewellery", "important diamond jewellery auction lot upcoming sale estimate"],
-  ["coin", "rare coin auction lot upcoming sale estimate"],
-  ["historical_artifact", "important antiquity historical artifact auction lot upcoming sale estimate"],
-  ["collectible", "important collectible memorabilia auction lot upcoming sale estimate"],
-  ["yacht", "superyacht auction lot sale estimate"],
-  ["aircraft", "private jet aircraft auction lot sale estimate"],
-  ["real_estate", "trophy estate property auction lot sale estimate"],
-  ["business", "business equity auction lot valuation sale"]
+  ["hypercar", "(site:rmsothebys.com OR site:goodingco.com OR site:bonhams.com OR site:bringatrailer.com) hypercar supercar auction lot estimate $500000"],
+  ["classic_car", "(site:rmsothebys.com OR site:bonhams.com OR site:artcurial.com OR site:goodingco.com) classic car auction lot estimate million USD"],
+  ["racing_car", "(site:rmsothebys.com OR site:bonhams.com OR site:goodingco.com OR site:artcurial.com) racing car auction lot estimate million"],
+  ["watch", "(site:phillips.com OR site:bonhams.com OR site:sothebys.com OR site:christies.com) rare watch auction lot estimate $500000"],
+  ["fine_art", "(site:sothebys.com OR site:christies.com OR site:bonhams.com OR site:phillips.com) fine art painting auction lot estimate million USD"],
+  ["sculpture", "(site:sothebys.com OR site:christies.com OR site:bonhams.com OR site:artcurial.com) sculpture auction lot estimate million USD"],
+  ["jewellery", "(site:sothebys.com OR site:christies.com OR site:bonhams.com OR site:phillips.com) diamond jewellery auction lot estimate $500000"],
+  ["coin", "(site:stackbowers.com OR site:ha.com OR site:spink.com OR site:bonhams.com) rare coin auction lot estimate $500000"],
+  ["historical_artifact", "(site:sothebys.com OR site:christies.com OR site:bonhams.com) antiquity artifact auction lot estimate million USD"],
+  ["collectible", "(site:christies.com OR site:bonhams.com OR site:ha.com OR site:joopiter.com) collectible memorabilia auction lot estimate $500000"],
+  ["yacht", "(site:fraseryachts.com OR site:burgessyachts.com OR site:camperandnicholsons.com OR site:bonhams.com) superyacht auction sale price million"],
+  ["aircraft", "(site:controller.com OR site:avbuyer.com OR site:bonhams.com OR site:auctionport.be) private jet aircraft auction sale price million"],
+  ["real_estate", "(site:sothebysrealty.com OR site:christiesrealestate.com OR site:conciergeauctions.com OR site:bonhams.com) trophy estate property auction price million"],
+  ["business", "(site:dealstream.com OR site:bizbuysell.com OR site:bonhams.com) business equity auction company sale valuation million"]
 ] as const;
 
 const MAX_PAGES = 8;
