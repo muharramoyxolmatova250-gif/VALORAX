@@ -7,20 +7,20 @@ const SEARXNG_BASE_URL = "https://valorax-searxng.onrender.com";
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const PASSES = [
-  ["hypercar", 'hypercar "bidding now" OR "upcoming auction" lot estimate $500000'],
-  ["classic_car", 'classic car "open for bidding" OR "upcoming auction" individual lot estimate $500000'],
-  ["racing_car", 'historic racing car "bidding now" OR "upcoming auction" lot estimate $500000'],
-  ["watch", 'rare luxury watch "open for bidding" OR "upcoming auction" lot estimate $500000'],
-  ["fine_art", 'masterpiece painting "bidding now" OR "upcoming auction" individual lot estimate $500000'],
-  ["sculpture", 'important sculpture "open for bidding" OR "upcoming auction" lot estimate $500000'],
-  ["jewellery", 'important diamond jewellery "bidding now" OR "upcoming auction" lot estimate $500000'],
-  ["coin", 'rare coin "open for bidding" OR "upcoming auction" lot estimate $500000'],
-  ["historical_artifact", 'important antiquity "bidding now" OR "upcoming auction" lot estimate $500000'],
-  ["collectible", 'important collectible memorabilia "open for bidding" OR "upcoming auction" lot estimate $500000'],
-  ["yacht", 'superyacht "for sale by auction" "bidding open" asking price'],
-  ["aircraft", 'private jet aircraft "auction" "bidding open" asking price'],
-  ["real_estate", 'trophy estate "property auction" "bidding open" asking price'],
-  ["business", 'company equity "open for bids" OR "auction" current offering valuation']
+  ["hypercar", "hypercar auction lot upcoming bidding estimate"],
+  ["classic_car", "classic car auction lot upcoming sale estimate"],
+  ["racing_car", "historic racing car auction lot upcoming sale estimate"],
+  ["watch", "rare luxury watch auction lot upcoming sale estimate"],
+  ["fine_art", "fine art painting auction lot upcoming sale estimate"],
+  ["sculpture", "important sculpture auction lot upcoming sale estimate"],
+  ["jewellery", "important diamond jewellery auction lot upcoming sale estimate"],
+  ["coin", "rare coin auction lot upcoming sale estimate"],
+  ["historical_artifact", "important antiquity historical artifact auction lot upcoming sale estimate"],
+  ["collectible", "important collectible memorabilia auction lot upcoming sale estimate"],
+  ["yacht", "superyacht auction lot sale estimate"],
+  ["aircraft", "private jet aircraft auction lot sale estimate"],
+  ["real_estate", "trophy estate property auction lot sale estimate"],
+  ["business", "business equity auction lot valuation sale"]
 ] as const;
 
 const MAX_PAGES = 5;
@@ -345,7 +345,7 @@ Deno.serve(async (req: Request) => {
     const errors: string[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const searchUrl = new URL("/search", SEARXNG_BASE_URL);
-      const valueQualifiedQuery = `${query} "auction lot"`;
+      const valueQualifiedQuery = query;
       searchUrl.searchParams.set("q", valueQualifiedQuery);
       searchUrl.searchParams.set("format", "json");
       searchUrl.searchParams.set("language", "en");
