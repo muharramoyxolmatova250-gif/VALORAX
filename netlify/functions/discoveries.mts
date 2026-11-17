@@ -28,7 +28,7 @@ export default async () => {
       Number(lot.published_value_usd) >= 500_000 &&
       Boolean(lot.value_checked_at) &&
       typeof lot.canonical_url === 'string' &&
-      /^https?:\\/\\//i.test(lot.canonical_url)
+      (lot.canonical_url.startsWith('https://') || lot.canonical_url.startsWith('http://'))
     )
 
     return Response.json(cards, {
