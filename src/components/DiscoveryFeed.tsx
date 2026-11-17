@@ -87,7 +87,7 @@ export default function DiscoveryFeed() {
           {items.map(item => {
             const imagesAllowed = ['licensed', 'permission_granted'].includes(item.image_usage_status)
             const image = imagesAllowed && Array.isArray(item.image_urls)
-              ? item.image_urls.find(url => typeof url === 'string' && /^https?:\\/\\//i.test(url))
+              ? item.image_urls.find(url => typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://')))
               : undefined
             const value = Number(item.published_value_usd)
             const verifiedValue = Number.isFinite(value) && value >= 500_000 && Boolean(item.value_checked_at)
