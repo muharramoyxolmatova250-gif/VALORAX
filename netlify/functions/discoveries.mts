@@ -13,16 +13,25 @@ export default async () => {
     const db = createClient(url, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
-    const { data, error } = await db.rpc('omnisight_public_discovery_feed', {
+    // Candidate cards show only lots with a checked USD value at or above
+    // the platform's hard $500,000 floor. They remain review-only leads.
+    const { data, error } = await db.rpc('omnisight_public_discovery_cards', {
       limit_count: 30,
     })
 
     if (error) {
-      console.error('OMNISIGHT discovery feed failed:', error.message)
+      console.error('OMNISIGHT discovery cards failed:', error.message)
       return Response.json({ error: 'Discovery feed is temporarily unavailable.' }, { status: 503 })
     }
 
-    return Response.json(data ?? [], {
+    const cards = (data ?? []).filter((lot: any) =>
+      Number(lot.published_value_usd) >= 500_000 &&
+      Boolean(lot.value_checked_at) &&
+      typeof lot.canonical_url === 'string' &&
+      /^https?:\\/\\//i.test(lot.canonical_url)
+    )
+
+    return Response.json(cards, {
       headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' },
     })
   } catch (error) {
