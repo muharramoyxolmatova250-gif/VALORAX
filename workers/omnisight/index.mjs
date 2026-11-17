@@ -5,7 +5,9 @@ import { createClient } from '@supabase/supabase-js'
 for (const key of ['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','REDIS_URL','SEARXNG_BASE_URL']) {
   if (!process.env[key]) throw new Error('Missing required environment variable: ' + key)
 }
-const dailyTarget = Math.max(1000, Number(process.env.OMNISIGHT_TARGET_DAILY_RAW || 100000))
+const dailyTargetRaw = Math.max(1000, Number(process.env.OMNISIGHT_TARGET_DAILY_RAW || 100000))
+const dailyTargetCandidates = Math.max(1000, Number(process.env.OMNISIGHT_TARGET_DAILY_CANDIDATES || 100000))
+const searchPageCount = Math.max(1, Math.min(5, Number(process.env.SEARCH_PAGES_PER_QUERY || 3)))
 const searchConcurrency = Math.max(1, Math.min(5, Number(process.env.SEARCH_CONCURRENCY || 3)))
 const candidateConcurrency = Math.max(1, Math.min(30, Number(process.env.WORKER_CONCURRENCY || 10)))
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -206,27 +208,39 @@ async function enrichLotPage(item, source, lotId) {
  return {enriched:true,fields:Object.keys(patch)}
 }
 async function discover(pass) {
- const [assetClass,q]=pass, url=new URL(endpoint)
- url.searchParams.set('q',q);url.searchParams.set('format','json');url.searchParams.set('language','en');url.searchParams.set('safesearch','1');url.searchParams.set('pageno','1')
- const res=await fetch(url,{headers:{'User-Agent':'VALORAX-OmniSight/1.0 (+https://valorax.netlify.app)',Accept:'application/json'},signal:AbortSignal.timeout(20000)})
- if(!res.ok) throw new Error('SEARXNG_HTTP_'+res.status)
- const payload=await res.json(), items=Array.isArray(payload.results)?payload.results.slice(0,30):[]
- let enqueued=0
- for(const hit of items) {
+ const [assetClass,q]=pass
+ let rawResults=0,enqueued=0
+ for(let page=1;page<=searchPageCount;page++) {
+  const today=new Date().toISOString().slice(0,10),rawKey='valorax:omnisight:raw-search-results:'+today
+  const already=Number(await searchQueue.client.then(c=>c.get(rawKey))||0)
+  if(already>=dailyTargetRaw) break
+  const url=new URL(endpoint)
+  url.searchParams.set('q',q);url.searchParams.set('format','json');url.searchParams.set('language','en');url.searchParams.set('safesearch','1');url.searchParams.set('pageno',String(page))
+  const res=await fetch(url,{headers:{'User-Agent':'VALORAX-OmniSight/1.0 (+https://valorax.netlify.app)',Accept:'application/json'},signal:AbortSignal.timeout(20000)})
+  if(!res.ok) throw new Error('SEARXNG_HTTP_'+res.status)
+  const payload=await res.json(), items=Array.isArray(payload.results)?payload.results.slice(0,30):[]
+  if(!items.length) break
+  const total=await searchQueue.client.then(c=>c.incrby(rawKey,items.length))
+  if(total===items.length) await searchQueue.client.then(c=>c.expire(rawKey,172800))
+  rawResults+=items.length
+  const permitted=Math.max(0,Math.min(items.length,dailyTargetRaw-(total-items.length)))
+  for(const hit of items.slice(0,permitted)) {
   const safe=safeUrl(hit?.url),title=typeof hit?.title==='string'?hit.title.replace(/\s+/g,' ').trim().slice(0,500):''
   if(!safe||!title) continue
   const hash=createHash('sha256').update(safe.url).digest('hex')
   const summary=typeof hit?.content==='string'?hit.content.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,1200):null
   await candidateQueue.add('store-candidate',{url:safe.url,host:safe.host,title,summary,assetClass,hash},{jobId:'lot_'+hash,removeOnComplete:true,removeOnFail:1000,attempts:3,backoff:{type:'exponential',delay:3000}})
-  enqueued++
+   enqueued++
+  }
+  if(items.length<10) break
  }
- return {assetClass,results:items.length,enqueued}
+ return {assetClass,rawResults,enqueued}
 }
 async function storeCandidate(job) {
- const today=new Date().toISOString().slice(0,10),key='valorax:omnisight:raw:'+today
+ const today=new Date().toISOString().slice(0,10),key='valorax:omnisight:candidates:'+today
  const count=await candidateQueue.client.then(c=>c.incr(key))
  if(count===1) await candidateQueue.client.then(c=>c.expire(key,172800))
- if(count>dailyTarget) return {capped:true}
+ if(count>dailyTargetCandidates) return {capped:true}
  const item=job.data,source=await getSource(item.host),sourceId=source.id,now=new Date().toISOString()
  const {error}=await db.from('omnisight_discovered_lots').upsert({source_id:sourceId,source_lot_key:item.hash,canonical_url:item.url,title:item.title,asset_class:item.assetClass,listing_status:'unknown',short_factual_summary:item.summary,source_title:item.host,source_record_hash:item.hash,verification_status:'candidate',data_use_status:'review_required',first_seen_at:now,last_seen_at:now,image_urls:[],image_usage_status:'unknown'},{onConflict:'source_id,source_lot_key',ignoreDuplicates:true})
  if(error) throw new Error('CANDIDATE_UPSERT_FAILED: '+error.message)
@@ -244,8 +258,9 @@ async function scheduleBatch() {
  try {
   const batch=Math.floor(Date.now()/300000)
   for(const pass of passes) await searchQueue.add('search-pass',{pass},{jobId:'search_'+batch+'_'+pass[0],removeOnComplete:true,removeOnFail:500,attempts:2,backoff:{type:'exponential',delay:5000}})
-  const count=await candidateQueue.client.then(c=>c.get('valorax:omnisight:raw:'+new Date().toISOString().slice(0,10)))
-  console.log(JSON.stringify({event:'search_batch_queued',passes:passes.length,dailyRawResultsProcessed:Number(count||0),dailyTarget,searchConcurrency,candidateConcurrency}))
+  const today=new Date().toISOString().slice(0,10)
+  const [rawCount,candidateCount]=await Promise.all([searchQueue.client.then(c=>c.get('valorax:omnisight:raw-search-results:'+today)),candidateQueue.client.then(c=>c.get('valorax:omnisight:candidates:'+today))])
+  console.log(JSON.stringify({event:'search_batch_queued',passes:passes.length,pagesPerQuery:searchPageCount,dailyRawSearchResults:Number(rawCount||0),dailyCandidateJobs:Number(candidateCount||0),dailyTargetRaw, dailyTargetCandidates,searchConcurrency,candidateConcurrency}))
  } catch(e) { console.error('SEARCH_SCHEDULER_ERROR',e instanceof Error?e.message:'UNKNOWN') }
  finally { scheduling=false }
 }
@@ -253,7 +268,7 @@ searchWorker.on('failed',(j,e)=>console.error('SEARCH_JOB_FAILED',j?.id,e.messag
 candidateWorker.on('failed',(j,e)=>console.error('CANDIDATE_JOB_FAILED',j?.id,e.message))
 searchWorker.on('error',e=>console.error('SEARCH_WORKER_ERROR',e.message))
 candidateWorker.on('error',e=>console.error('CANDIDATE_WORKER_ERROR',e.message))
-console.log(JSON.stringify({event:'omnisight_worker_started',targetDailyRawResults:dailyTarget,searchPassesPerBatch:passes.length,searchConcurrency,candidateConcurrency,mode:'discovery_candidates_only_no_unapproved_source_scraping'}))
+console.log(JSON.stringify({event:'omnisight_worker_started',targetDailyRawResults:dailyTargetRaw,targetDailyCandidates:dailyTargetCandidates,searchPassesPerBatch:passes.length,searchPagesPerQuery:searchPageCount,searchConcurrency,candidateConcurrency,mode:'discovery_candidates_only_no_unapproved_source_scraping'}))
 await scheduleBatch()
 const timer=setInterval(scheduleBatch,300000)
 async function shutdown(signal) {
