@@ -530,9 +530,11 @@ Deno.serve(async (req: Request) => {
     queryStats.push(s);
   }
   const workerStats = queryStats[0] || {};
-  const workerFailed = Number(workerStats.pagesRead || 0) === 0 && Number(workerStats.pagesFailed || 0) > 0;
+  const workerFailed = Number(workerStats.pagesFailed || 0) > 0;
+  const retryDelayMinutes = Math.min(30, 2 ** Number(claimedJob.attempts || 1));
   const jobUpdate = {
     status: workerFailed ? (Number(claimedJob.attempts || 0) >= 5 ? "paused" : "failed") : "completed",
+    run_after: workerFailed ? new Date(Date.now() + retryDelayMinutes * 60_000).toISOString() : new Date().toISOString(),
     pages_processed: Number(workerStats.pagesRead || 0),
     raw_results: Number(workerStats.rawResults || 0),
     lots_stored: Number(workerStats.stored || 0),
