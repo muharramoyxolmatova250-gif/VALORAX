@@ -44,6 +44,15 @@ export interface AuctionLot {
   publishedValueUsd?: number
   valueBasis?: string
   summary?: string
+  lotNumber?: string
+  saleDate?: string
+  auctionStartsAt?: string
+  auctionEndsAt?: string
+  location?: string
+  estimateLow?: number
+  estimateHigh?: number
+  images?: string[]
+  imageRightsStatus?: string
   aiStatus?: 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'stale' | 'not_started'
   aiVerdict?: 'GOOD' | 'BAD' | 'UNCERTAIN' | null
   aiSummary?: string
