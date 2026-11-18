@@ -7,12 +7,14 @@ services:
     rootDir: workers/omnisight
     buildCommand: npm install --omit=dev
     startCommand: npm start
-    autoDeployTrigger: commit
+    autoDeployTrigger: off
     maxShutdownDelaySeconds: 120
     envVars:
       - key: SUPABASE_URL
         value: https://rokrbppnohafumsueicg.supabase.co
       - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
         sync: false
       - key: SEARXNG_BASE_URL
         value: https://valorax-searxng.onrender.com
