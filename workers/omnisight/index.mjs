@@ -68,9 +68,8 @@ async function importSothebysFromApify() {
   mode:'search',
   query:process.env.APIFY_SOTHEBYS_QUERY || 'rare art jewelry watches',
   saleType:'upcoming',
-  category:'contemporary-art',
-  department:'',
   maxItems:APIFY_MAX_ITEMS,
+  ...(process.env.APIFY_SOTHEBYS_DEPARTMENT ? {department:process.env.APIFY_SOTHEBYS_DEPARTMENT} : {}),
  }
  const started=await apifyJson('/acts/'+encodeURIComponent(APIFY_ACTOR_ID)+'/runs?waitForFinish=120&maxItems='+APIFY_MAX_ITEMS+'&maxTotalChargeUsd='+APIFY_MAX_CHARGE_USD,{
   method:'POST',
