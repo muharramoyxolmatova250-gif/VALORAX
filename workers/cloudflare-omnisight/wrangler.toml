@@ -1,0 +1,9 @@
+name = "valorax-omnisight"
+main = "src/index.js"
+compatibility_date = "2026-11-18"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+APIFY_SOTHEBYS_QUERY = "rare art jewelry watches"
