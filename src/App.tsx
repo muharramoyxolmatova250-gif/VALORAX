@@ -5,7 +5,6 @@ import { Lock, Activity, Shield, TrendingUp } from 'lucide-react'
 import Header from './components/Header'
 import ProfileWall from './components/ProfileWall'
 import AuctionDirectory from './components/AuctionDirectory'
-import DiscoveryFeed from './components/DiscoveryFeed'
 import AuctionModal from './components/AuctionModal'
 import ExternalLotModal from './components/ExternalLotModal'
 import SovereignDrawer from './components/SovereignDrawer'
@@ -187,11 +186,6 @@ export default function App() {
               OPEN OMNISIGHT
             </button>
           </section>
-
-          {/* OmniSight discovery feed — separate from verified live catalogue */}
-          <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-            <DiscoveryFeed />
-          </motion.section>
 
           {/* Auction Directory */}
           <motion.section
