@@ -19,11 +19,11 @@ async function fetchDiscoveredCandidates(): Promise<AuctionLot[]> {
 
     return result.flatMap((lot: any): AuctionLot[] => {
       const value = Number(lot.published_value_usd)
-      const low = Number(lot.estimate_low)
+      const low = Number(lot.published_value_usd)
       const checked = Boolean(lot.value_checked_at)
       const url = typeof lot.canonical_url === 'string' ? lot.canonical_url : ''
-      // Discovery candidates appear in the same vault grid, but are visibly
-      // labelled REVIEW REQUIRED and never represented as approved live inventory.
+      // published_value_usd is only populated from the independently checked
+      // estimate low by the discovery query; never infer it from an upper bound.
       if (!checked || !Number.isFinite(value) || value < 500_000 ||
           !Number.isFinite(low) || low < 500_000 ||
           !(url.startsWith('https://') || url.startsWith('http://'))) return []
