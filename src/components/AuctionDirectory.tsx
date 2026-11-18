@@ -118,10 +118,10 @@ function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot
           <span className="rounded-sm px-2 py-1 text-[8px] font-black tracking-widest"
             style={{
               background: isLive ? 'rgba(16,185,129,0.10)' : 'rgba(255,255,255,0.06)',
-              border: isLive ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(255,255,255,0.10)',
-              color: isLive ? '#34D399' : 'rgba(255,255,255,0.45)',
+              border: isLive ? '1px solid rgba(16,185,129,0.25)' : lot.reviewRequired ? '1px solid rgba(251,191,36,0.28)' : '1px solid rgba(255,255,255,0.10)',
+              color: isLive ? '#34D399' : lot.reviewRequired ? '#FBBF24' : 'rgba(255,255,255,0.45)',
             }}>
-            {isLive ? <span className="inline-flex items-center gap-1"><Radio size={8} /> LIVE</span> : lot.status || 'AUCTION'}
+            {isLive ? <span className="inline-flex items-center gap-1"><Radio size={8} /> LIVE</span> : lot.reviewRequired ? 'REVIEW REQUIRED' : lot.status || 'AUCTION'}
           </span>
         </div>
 
@@ -166,10 +166,10 @@ function LotCard({ lot, onSelect, onAnalyze }: { lot: AuctionLot; onSelect: (lot
           </div>
           <button
             type="button"
-            onClick={event => { event.stopPropagation(); onAnalyze(lot) }}
+            onClick={event => { event.stopPropagation(); onSelect(lot) }}
             className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-white/55 transition hover:text-[#D4AF37]"
           >
-            OPEN LOT DOSSIER <ExternalLink size={9} />
+            VIEW ORIGINAL LOT <ExternalLink size={9} />
           </button>
         </div>
 
@@ -205,7 +205,7 @@ export default function AuctionDirectory({ lots, onSelect, onAnalyze }: AuctionD
         <div>
           <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.25em]" style={{ color: GOLD_DIM }}>GLOBAL AUCTION NETWORK</p>
           <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Live Auction Vaults</h2>
-          <p className="mt-2 max-w-xl text-xs text-white/35">Curated access to rare assets across global auction markets.</p>
+          <p className="mt-2 max-w-xl text-xs text-white/35">Verified high-value auction inventory and newly discovered candidates. Review-required leads are clearly labelled.</p>
         </div>
         <div className="font-mono text-[9px] tracking-widest" style={{ color: GOLD_DIM }}>{filteredLots.length} LOTS</div>
       </div>
@@ -252,8 +252,8 @@ export default function AuctionDirectory({ lots, onSelect, onAnalyze }: AuctionD
       ) : (
         <div className="rounded-xl py-16 text-center" style={{ background: CARD_BG, border: '1px solid rgba(212,175,55,0.10)' }}>
           <div className="mb-3 text-3xl">◇</div>
-          <p className="text-sm font-bold text-white/60">No auction lots available</p>
-          <p className="mt-2 text-[10px] text-white/25">Auction inventory will appear here when the global data feed is connected.</p>
+          <p className="text-sm font-bold text-white/60">No qualifying auction lots found</p>
+          <p className="mt-2 text-[10px] text-white/25">Newly discovered $500,000+ leads will appear here as they are found and checked.</p>
         </div>
       )}
     </div>
