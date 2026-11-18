@@ -17,7 +17,7 @@ const searchQueue = new Queue('valorax-omnisight-search', { connection })
 const candidateQueue = new Queue('valorax-omnisight-candidates', { connection })
 const apifyQueue = new Queue('valorax-omnisight-apify', { connection })
 const sourceCache = new Map()
-const APIFY_ACTOR_ID = '0moL5aaXfdBW806A8'
+const APIFY_ACTOR_ID = 'crawlergang~sothebys-lot-scraper'
 const APIFY_MAX_ITEMS = 50
 const APIFY_MAX_CHARGE_USD = 1
 
@@ -66,7 +66,7 @@ async function importSothebysFromApify() {
  if(!token)return {skipped:true,reason:'APIFY_API_TOKEN_NOT_CONFIGURED'}
  const input={
   mode:'search',
-  query:'contemporary art',
+  query:process.env.APIFY_SOTHEBYS_QUERY || 'rare art jewelry watches',
   saleType:'upcoming',
   category:'contemporary-art',
   department:'',
