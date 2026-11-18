@@ -24,6 +24,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Syntax-check Apify ingestion worker
+        run: node --check workers/omnisight/index.mjs
       - name: Set up Deno
         uses: denoland/setup-deno@v2
         with:
