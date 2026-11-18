@@ -1,6 +1,65 @@
 import { supabase } from '../lib/supabase'
 import type { AuctionLot } from '../types'
 
+const categoryMap: Record<string, AuctionLot['category']> = {
+  automotive: 'Cars', hypercar: 'Cars', classic_car: 'Cars', racing_car: 'Cars',
+  watch: 'Watches', jewelry: 'Jewelry', jewellery: 'Jewelry',
+  art: 'Fine Art', fine_art: 'Fine Art', sculpture: 'Fine Art',
+  real_estate: 'Real Estate', property: 'Real Estate', aircraft: 'Aircraft',
+  yacht: 'Luxury', collectible: 'Collectibles', coin: 'Collectibles',
+  historical_artifact: 'Historical', antiquity: 'Historical',
+}
+
+async function fetchDiscoveredCandidates(): Promise<AuctionLot[]> {
+  try {
+    const response = await fetch('/api/discoveries')
+    if (!response.ok) throw new Error('Discovery feed returned ' + response.status)
+    const result = await response.json()
+    if (!Array.isArray(result)) return []
+
+    return result.flatMap((lot: any): AuctionLot[] => {
+      const value = Number(lot.published_value_usd)
+      const low = Number(lot.estimate_low)
+      const checked = Boolean(lot.value_checked_at)
+      const url = typeof lot.canonical_url === 'string' ? lot.canonical_url : ''
+      // Discovery candidates appear in the same vault grid, but are visibly
+      // labelled REVIEW REQUIRED and never represented as approved live inventory.
+      if (!checked || !Number.isFinite(value) || value < 500_000 ||
+          !Number.isFinite(low) || low < 500_000 ||
+          !(url.startsWith('https://') || url.startsWith('http://'))) return []
+
+      return [{
+        id: 'discovery-' + String(lot.id),
+        title: String(lot.title || 'Uncatalogued asset'),
+        subtitle: [lot.source_title, lot.asset_class].filter(Boolean).join(' · '),
+        category: categoryMap[String(lot.asset_class || '').toLowerCase()] || 'Luxury',
+        image: '',
+        currentBid: 0,
+        reserve: value,
+        escrow: 0,
+        secondsLeft: 0,
+        bids: 0,
+        verified: false,
+        creator: 'OmniSight · review required',
+        source: String(lot.auction_house || lot.source_title || 'Auction source'),
+        sourceUrl: url,
+        status: 'REVIEW REQUIRED',
+        currency: 'USD',
+        publishedValueUsd: value,
+        valueBasis: 'checked_source_value',
+        summary: String(lot.short_factual_summary || ''),
+        estimateLow: low,
+        estimateHigh: lot.estimate_high == null ? undefined : Number(lot.estimate_high),
+        imageRightsStatus: String(lot.image_usage_status || 'unknown'),
+        reviewRequired: true,
+      }]
+    })
+  } catch (error) {
+    console.error('VALORAX discovery candidates unavailable:', error)
+    return []
+  }
+}
+
 export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
   let externalLots: AuctionLot[] = []
 
@@ -82,6 +141,9 @@ export async function fetchAllGlobalAuctions(): Promise<AuctionLot[]> {
     (lot.status === 'UPCOMING' || lot.secondsLeft > 0) &&
     Math.max(lot.currentBid, lot.reserve) >= 500_000
   )
+  const discovered = await fetchDiscoveredCandidates()
+  const seen = new Set([...eligibleExternal, ...eligibleDatabase].map(lot => lot.sourceUrl).filter(Boolean))
+  const uniqueDiscovered = discovered.filter(lot => !seen.has(lot.sourceUrl || ''))
 
-  return [...eligibleExternal, ...eligibleDatabase]
+  return [...eligibleExternal, ...eligibleDatabase, ...uniqueDiscovered]
 }
