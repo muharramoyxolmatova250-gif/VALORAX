@@ -39,7 +39,8 @@ export interface AuctionLot {
   creator: string
   source?: string
   sourceUrl?: string
-  status?: 'LIVE' | 'UPCOMING' | 'ENDED'
+  status?: 'LIVE' | 'UPCOMING' | 'ENDED' | 'REVIEW REQUIRED'
+  reviewRequired?: boolean
   currency?: string
   publishedValueUsd?: number
   valueBasis?: string
